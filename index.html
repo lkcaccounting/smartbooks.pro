@@ -1,0 +1,1071 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>LKC Accounting</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f4f1ec;--bg2:#ebe7de;--card:#ffffff;--border:#ddd8cc;
+  --text:#1c1a16;--text2:#5c584f;--text3:#8c8880;
+  --green:#1b4332;--green2:#2d6a4f;--green-pale:#e8f0eb;
+  --gold:#b5650a;--gold-pale:#fdf3e1;
+  --red:#b91c1c;--red-pale:#fef2f2;
+  --blue:#1d4ed8;--blue-pale:#eff6ff;
+  --sw:240px;--th:56px;
+  --r:10px;--r2:14px;
+  --sh:0 2px 12px rgba(0,0,0,.07);--sh2:0 8px 32px rgba(0,0,0,.13);
+  --fd:'Playfair Display',Georgia,serif;
+  --fb:'Plus Jakarta Sans',system-ui,sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--fb);background:var(--bg);color:var(--text);font-size:14px;line-height:1.6}
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:var(--bg2)}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+a{color:var(--gold);text-decoration:none}a:hover{text-decoration:underline}
+
+/* ── LOGIN ── */
+.login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;
+  background:linear-gradient(135deg,#1b4332 0%,#2d6a4f 55%,#b5650a 100%);padding:20px}
+.login-card{background:var(--card);border-radius:20px;padding:40px 36px;width:100%;max-width:400px;box-shadow:var(--sh2)}
+.brand-row{text-align:center;margin-bottom:32px}
+.brand-icon{width:58px;height:58px;background:var(--green);color:#fff;font-size:26px;border-radius:16px;
+  display:inline-flex;align-items:center;justify-content:center;margin-bottom:12px;font-family:var(--fd)}
+.brand-row h1{font-family:var(--fd);font-size:25px;color:var(--green)}
+.brand-row p{color:var(--text2);font-size:13px;margin-top:3px}
+
+/* ── SETUP STEPS ── */
+.step{animation:fadeIn .3s ease}
+.step.hidden{display:none!important}
+.step-ttl{font-family:var(--fd);font-size:17px;color:var(--green);margin-bottom:5px}
+.step-desc{color:var(--text2);font-size:13px;margin-bottom:18px}
+
+/* ── FORMS ── */
+.fg{margin-bottom:15px}
+label{display:block;font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px}
+.lh{font-weight:400;text-transform:none;letter-spacing:0;color:var(--text3)}
+input[type=text],input[type=password],input[type=number],input[type=date],select,textarea{
+  width:100%;padding:9px 13px;border:1.5px solid var(--border);border-radius:var(--r);
+  font-family:var(--fb);font-size:14px;color:var(--text);background:var(--card);outline:none;transition:border-color .2s,box-shadow .2s}
+input:focus,select:focus,textarea:focus{border-color:var(--green);box-shadow:0 0 0 3px var(--green-pale)}
+textarea{resize:vertical;min-height:72px}
+select{cursor:pointer}
+small{color:var(--text3);font-size:11px;display:block;margin-top:4px}
+small a{color:var(--gold)}
+
+/* ── BUTTONS ── */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:9px 17px;border-radius:var(--r);
+  font-family:var(--fb);font-size:13px;font-weight:500;cursor:pointer;border:none;transition:all .18s;text-decoration:none}
+.btn-p{background:var(--green);color:#fff}.btn-p:hover{background:var(--green2);transform:translateY(-1px);box-shadow:0 4px 12px rgba(27,67,50,.28)}
+.btn-g{background:transparent;color:var(--green);border:1.5px solid var(--green)}.btn-g:hover{background:var(--green-pale)}
+.btn-o{background:transparent;color:var(--text2);border:1.5px solid var(--border)}.btn-o:hover{background:var(--bg2)}
+.btn-d{background:var(--red);color:#fff}.btn-d:hover{background:#991b1b}
+.btn-a{background:var(--gold);color:#fff}.btn-a:hover{background:#9a5608}
+.btn-sm{padding:5px 11px;font-size:12px}
+.btn-full{width:100%;justify-content:center;padding:11px}
+
+/* ── ALERTS ── */
+.alert{padding:10px 13px;border-radius:var(--r);font-size:13px;margin-bottom:14px}
+.a-err{background:var(--red-pale);color:var(--red);border:1px solid #fecaca}
+.a-ok{background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0}
+.a-info{background:var(--blue-pale);color:var(--blue);border:1px solid #bfdbfe}
+.a-warn{background:var(--gold-pale);color:var(--gold);border:1px solid #fed7aa}
+
+/* ── APP SHELL ── */
+.app-shell{display:flex;min-height:100vh}
+
+/* ── SIDEBAR ── */
+.sidebar{width:var(--sw);background:var(--green);color:#fff;display:flex;flex-direction:column;
+  position:fixed;top:0;left:0;bottom:0;z-index:100;transition:transform .28s cubic-bezier(.4,0,.2,1);overflow-y:auto}
+.sb-brand{padding:18px 18px 14px;display:flex;align-items:center;gap:10px;border-bottom:1px solid rgba(255,255,255,.12)}
+.sb-icon{width:34px;height:34px;background:rgba(255,255,255,.15);border-radius:9px;display:flex;align-items:center;justify-content:center;font-family:var(--fd);font-size:17px}
+.sb-brand span{font-family:var(--fd);font-size:19px;letter-spacing:.02em}
+.sb-nav{flex:1;padding:10px 8px}
+.ni{display:flex;align-items:center;gap:9px;padding:9px 11px;border-radius:8px;cursor:pointer;
+  color:rgba(255,255,255,.72);font-size:13px;font-weight:500;transition:all .18s;margin-bottom:1px;
+  border:none;background:none;width:100%;text-align:left}
+.ni:hover{background:rgba(255,255,255,.1);color:#fff}
+.ni.active{background:rgba(255,255,255,.18);color:#fff}
+.ni .ic{font-size:15px;width:18px;text-align:center}
+.sb-foot{padding:12px 10px;border-top:1px solid rgba(255,255,255,.12)}
+.user-pill{background:rgba(255,255,255,.12);border-radius:8px;padding:8px 11px;font-size:12px;margin-bottom:7px}
+.user-pill strong{display:block;color:#fff}
+.user-pill span{color:rgba(255,255,255,.6);font-size:10px;text-transform:capitalize}
+.btn-logout{background:rgba(255,255,255,.1);color:rgba(255,255,255,.72);border:none;border-radius:8px;
+  padding:7px 12px;width:100%;cursor:pointer;font-size:13px;font-family:var(--fb);transition:all .18s}
+.btn-logout:hover{background:rgba(255,255,255,.18);color:#fff}
+
+/* ── TOPBAR ── */
+.topbar{position:fixed;top:0;left:var(--sw);right:0;height:var(--th);background:var(--card);
+  border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 22px;gap:14px;z-index:50;box-shadow:0 1px 4px rgba(0,0,0,.05)}
+.menu-tog{display:none;background:none;border:none;font-size:20px;cursor:pointer;color:var(--text2);padding:4px}
+.tb-title{font-family:var(--fd);font-size:18px;color:var(--green);flex:1}
+.tb-right{display:flex;align-items:center;gap:14px}
+.tb-user{font-size:13px;color:var(--text2);font-weight:500}
+.notif-bell{cursor:pointer;font-size:17px;position:relative;user-select:none}
+.notif-bdg{background:var(--red);color:#fff;font-size:10px;padding:1px 5px;border-radius:99px;vertical-align:super}
+
+/* ── CONTENT ── */
+.main-content{margin-left:var(--sw);margin-top:var(--th);padding:26px;flex:1;min-height:calc(100vh - var(--th));animation:fadeIn .25s ease}
+
+/* ── PAGE HEADER ── */
+.pg-hd{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:22px;gap:12px;flex-wrap:wrap}
+.pg-hd h2{font-family:var(--fd);font-size:21px;color:var(--green)}
+.pg-hd p{color:var(--text2);font-size:13px;margin-top:2px}
+.pg-act{display:flex;gap:7px;flex-wrap:wrap}
+
+/* ── CARDS ── */
+.card{background:var(--card);border-radius:var(--r);border:1px solid var(--border);padding:18px;box-shadow:var(--sh)}
+.card-ttl{font-family:var(--fd);font-size:15px;color:var(--green);margin-bottom:14px;padding-bottom:9px;border-bottom:1px solid var(--border)}
+
+/* ── STATS ── */
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:14px;margin-bottom:22px}
+.sc{background:var(--card);border-radius:var(--r);border:1px solid var(--border);padding:16px 18px;position:relative;overflow:hidden}
+.sc::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--green)}
+.sc.acc::before{background:var(--gold)}.sc.red::before{background:var(--red)}.sc.ok::before{background:#15803d}.sc.bl::before{background:var(--blue)}
+.sc-ico{font-size:20px;margin-bottom:6px}
+.sc-val{font-family:var(--fd);font-size:22px;color:var(--text);margin-bottom:1px}
+.sc-lbl{font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:.05em}
+
+/* ── TABLE ── */
+.tw{overflow-x:auto;border-radius:var(--r)}
+table{width:100%;border-collapse:collapse;font-size:13px}
+thead tr{background:var(--bg2)}
+th{padding:9px 13px;text-align:left;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--text2);white-space:nowrap}
+td{padding:10px 13px;border-bottom:1px solid var(--border);color:var(--text);vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tbody tr:hover{background:var(--bg)}
+
+/* ── BADGES ── */
+.bdg{display:inline-flex;align-items:center;padding:2px 9px;border-radius:99px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+.bdg-ok{background:#f0fdf4;color:#15803d}.bdg-red{background:var(--red-pale);color:var(--red)}
+.bdg-warn{background:var(--gold-pale);color:var(--gold)}.bdg-info{background:var(--blue-pale);color:var(--blue)}
+.bdg-n{background:var(--bg2);color:var(--text2)}
+
+/* ── MODAL ── */
+.modal-ov{position:fixed;inset:0;background:rgba(0,0,0,.42);display:flex;align-items:center;justify-content:center;z-index:1000;padding:20px;animation:fadeIn .2s ease}
+.modal-box{background:var(--card);border-radius:var(--r2);width:100%;max-width:500px;max-height:90vh;overflow-y:auto;box-shadow:var(--sh2);animation:slideUp .25s ease}
+.modal-hd{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border)}
+.modal-hd h3{font-family:var(--fd);font-size:17px;color:var(--green)}
+.modal-x{background:none;border:none;color:var(--text3);font-size:18px;cursor:pointer;padding:2px 6px;border-radius:4px}
+.modal-x:hover{background:var(--bg2)}
+.modal-body{padding:20px}
+.modal-ft{padding:12px 20px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end}
+
+/* ── TOAST ── */
+.toast-wrap{position:fixed;bottom:22px;right:22px;z-index:2000;display:flex;flex-direction:column;gap:7px}
+.toast{background:var(--text);color:#fff;padding:11px 16px;border-radius:9px;font-size:13px;box-shadow:var(--sh2);animation:slideUp .25s ease;max-width:300px}
+.toast.ok{background:#15803d}.toast.err{background:var(--red)}.toast.info{background:var(--blue)}.toast.warn{background:var(--gold)}
+
+/* ── FILTER BAR ── */
+.filter-bar{display:flex;gap:9px;margin-bottom:14px;flex-wrap:wrap;align-items:center}
+.si{flex:1;min-width:180px;max-width:300px;padding:7px 13px;border:1.5px solid var(--border);border-radius:var(--r);font-size:13px;font-family:var(--fb);outline:none}
+.si:focus{border-color:var(--green)}
+
+/* ── AI CHAT ── */
+.ai-wrap{display:flex;flex-direction:column;height:calc(100vh - var(--th) - 100px);max-height:640px}
+.ai-msgs{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:10px;background:var(--bg);border-radius:var(--r) var(--r) 0 0;border:1px solid var(--border);border-bottom:none}
+.ai-msg{max-width:82%;padding:9px 13px;border-radius:11px;font-size:13px;line-height:1.55}
+.ai-msg.user{background:var(--green);color:#fff;align-self:flex-end;border-bottom-right-radius:3px}
+.ai-msg.bot{background:var(--card);color:var(--text);align-self:flex-start;border-bottom-left-radius:3px;border:1px solid var(--border)}
+.ai-msg.typing{color:var(--text3);font-style:italic}
+.ai-in-row{display:flex;gap:8px;padding:10px;background:var(--card);border:1px solid var(--border);border-radius:0 0 var(--r) var(--r)}
+.ai-in-row input{flex:1;border:1.5px solid var(--border);border-radius:8px;padding:8px 12px;font-family:var(--fb);font-size:13px}
+.ai-in-row input:focus{border-color:var(--green);outline:none}
+
+/* ── RECENT LIST ── */
+.rl{display:flex;flex-direction:column}
+.ri{display:flex;align-items:center;padding:9px 0;border-bottom:1px solid var(--border);gap:10px;font-size:13px}
+.ri:last-child{border-bottom:none}
+.rdot{width:7px;height:7px;border-radius:50%;background:var(--green);flex-shrink:0}
+.rdot.sale{background:#15803d}.rdot.restock{background:var(--blue)}.rdot.alert{background:var(--red)}
+.ri-meta{flex:1}.ri-meta strong{display:block}.ri-meta span{color:var(--text3);font-size:11px}
+.ri-amt{font-weight:600;color:var(--green)}
+
+/* ── GRID ── */
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
+
+/* ── MISC ── */
+.hidden{display:none!important}
+.mt{margin-top:14px}.mb{margin-bottom:14px}
+.fb{display:flex;justify-content:space-between;align-items:center}
+.muted{color:var(--text2)}.sm{font-size:12px}.bold{font-weight:600}
+.r-owner{color:var(--gold);font-weight:600}.r-manager{color:var(--blue);font-weight:600}.r-sales{color:#15803d;font-weight:600}
+.empty{text-align:center;padding:40px 20px;color:var(--text3)}
+.empty .ei{font-size:36px;margin-bottom:10px}
+.divider{height:1px;background:var(--border);margin:14px 0}
+.setup-lnk{text-align:center;margin-top:14px}
+.setup-lnk a{color:var(--gold);font-size:13px}
+
+/* ── ANIMATIONS ── */
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes slideUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+
+/* ── RESPONSIVE ── */
+@media(max-width:768px){
+  .sidebar{transform:translateX(-100%)}.sidebar.open{transform:translateX(0)}
+  .topbar{left:0}.main-content{margin-left:0;padding:14px}.menu-tog{display:block}
+  .g2,.g3{grid-template-columns:1fr}.stats-grid{grid-template-columns:1fr 1fr}
+}
+@media(max-width:480px){.stats-grid{grid-template-columns:1fr}}
+@media print{
+  .sidebar,.topbar,.pg-act,.btn,.filter-bar{display:none!important}
+  .main-content{margin:0;padding:0}
+  body{background:#fff}
+}
+</style>
+</head>
+<body>
+
+<!-- ══════════ LOGIN / SETUP SCREEN ══════════ -->
+<div id="loginWrap" class="login-wrap">
+  <div class="login-card">
+    <div class="brand-row">
+      <div class="brand-icon">₦</div>
+      <h1>LKC Accounting</h1>
+      <p>Business Management System</p>
+    </div>
+
+    <!-- LOGIN FORM -->
+    <div id="viewLogin">
+      <div id="loginErr" class="alert a-err hidden"></div>
+      <div class="fg"><label>Full Name</label><input type="text" id="lgName" placeholder="Your name" autocomplete="off"/></div>
+      <div class="fg"><label>Password</label><input type="password" id="lgPass" placeholder="Your password"/></div>
+      <button class="btn btn-p btn-full" onclick="A.login()">Sign In</button>
+      <div id="setupLink" class="setup-lnk hidden"><a href="#" onclick="A.showSetup()">⚙ First time? Complete Admin Setup</a></div>
+    </div>
+
+    <!-- SETUP FLOW -->
+    <div id="viewSetup" class="hidden">
+      <div id="setupErr" class="alert a-err hidden"></div>
+      <div id="setupOk" class="alert a-ok hidden"></div>
+
+      <div id="s1" class="step">
+        <div class="step-ttl">Step 1 of 3 — Admin Password</div>
+        <div class="step-desc">Set your master admin password. Required before any business can be configured.</div>
+        <div class="fg"><label>Admin Password</label><input type="password" id="aPass" placeholder="Min 4 characters"/></div>
+        <div class="fg"><label>Confirm</label><input type="password" id="aPassC" placeholder="Repeat password"/></div>
+        <button class="btn btn-p btn-full" onclick="Setup.s1()">Continue →</button>
+        <div class="setup-lnk"><a href="#" onclick="A.showLogin()">← Back to login</a></div>
+      </div>
+
+      <div id="s2" class="step hidden">
+        <div class="step-ttl">Step 2 of 3 — Business Info</div>
+        <div class="fg"><label>Business Name *</label><input type="text" id="bName" placeholder="e.g. Kamau General Store"/></div>
+        <div class="fg"><label>Address</label><input type="text" id="bAddr" placeholder="e.g. Tom Mboya St, Nairobi"/></div>
+        <div class="fg"><label>Phone</label><input type="text" id="bPhone" placeholder="e.g. 0712 345 678"/></div>
+        <div class="fg"><label>Currency Symbol</label><input type="text" id="bCur" value="KSh" placeholder="KSh / $ / £"/></div>
+        <div class="fg"><label>KRA PIN <span class="lh">(optional)</span></label><input type="text" id="bKRA" placeholder="P051234567X"/></div>
+        <div class="fg">
+          <label>Hugging Face API Key <span class="lh">(free AI)</span></label>
+          <input type="text" id="hfKey" placeholder="hf_xxxxxxxxxxxxxxxxxxxxxxxx"/>
+          <small>Free at <a href="https://huggingface.co/settings/tokens" target="_blank">huggingface.co</a> → New Token → Read. Stored locally only.</small>
+        </div>
+        <button class="btn btn-p btn-full" onclick="Setup.s2()">Continue →</button>
+      </div>
+
+      <div id="s3" class="step hidden">
+        <div class="step-ttl">Step 3 of 3 — Owner Account</div>
+        <div class="step-desc">Create the business owner login. The owner has full access.</div>
+        <div class="fg"><label>Owner Full Name *</label><input type="text" id="oName" placeholder="e.g. John Kamau"/></div>
+        <div class="fg"><label>Owner Password *</label><input type="password" id="oPass" placeholder="Min 4 characters"/></div>
+        <button class="btn btn-p btn-full" onclick="Setup.s3()">Finish Setup →</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ APP SHELL ══════════ -->
+<div id="appShell" class="app-shell hidden">
+  <aside class="sidebar" id="sidebar">
+    <div class="sb-brand">
+      <div class="sb-icon">₦</div>
+      <span>LKC</span>
+    </div>
+    <nav class="sb-nav" id="sbNav"></nav>
+    <div class="sb-foot">
+      <div class="user-pill" id="userPill"></div>
+      <button class="btn-logout" onclick="A.logout()">Sign Out</button>
+    </div>
+  </aside>
+
+  <div class="topbar">
+    <button class="menu-tog" onclick="A.togSb()">☰</button>
+    <div class="tb-title" id="tbTitle">Dashboard</div>
+    <div class="tb-right">
+      <div id="nBell" class="notif-bell hidden" onclick="P.notifications()">🔔<span class="notif-bdg" id="nBdg">0</span></div>
+      <span class="tb-user" id="tbUser"></span>
+    </div>
+  </div>
+
+  <main class="main-content" id="mc"></main>
+</div>
+
+<!-- ══════════ MODAL ══════════ -->
+<div id="mOv" class="modal-ov hidden" onclick="M.ov(event)">
+  <div class="modal-box">
+    <div class="modal-hd"><h3 id="mTitle"></h3><button class="modal-x" onclick="M.close()">✕</button></div>
+    <div class="modal-body" id="mBody"></div>
+    <div class="modal-ft" id="mFt"></div>
+  </div>
+</div>
+
+<!-- ══════════ TOASTS ══════════ -->
+<div id="toasts" class="toast-wrap"></div>
+
+<script>
+// ═══════════════════════════════════════════════════
+//  DB — localStorage layer
+// ═══════════════════════════════════════════════════
+const DB = {
+  PFX:'lkc_',
+  get(k){try{const v=localStorage.getItem(this.PFX+k);return v?JSON.parse(v):null}catch{return null}},
+  set(k,v){try{localStorage.setItem(this.PFX+k,JSON.stringify(v));return true}catch{return false}},
+  del(k){localStorage.removeItem(this.PFX+k)},
+  getUsers(){return this.get('users')||[]},
+  getUser(id){return this.getUsers().find(u=>u.id===id)||null},
+  saveUser(user){const u=this.getUsers(),i=u.findIndex(x=>x.id===user.id);if(i>=0)u[i]=user;else u.push(user);this.set('users',u)},
+  delUser(id){this.set('users',this.getUsers().filter(u=>u.id!==id))},
+  getProducts(){return this.get('products')||[]},
+  getProduct(id){return this.getProducts().find(p=>p.id===id)||null},
+  saveProduct(p){const arr=this.getProducts(),i=arr.findIndex(x=>x.id===p.id);if(i>=0)arr[i]=p;else arr.push(p);this.set('products',arr)},
+  delProduct(id){this.set('products',this.getProducts().filter(p=>p.id!==id))},
+  updStock(id,delta){const arr=this.getProducts(),i=arr.findIndex(p=>p.id===id);if(i>=0){arr[i].quantity=Math.max(0,(arr[i].quantity||0)+delta);this.set('products',arr);return arr[i]}return null},
+  getSales(){return this.get('sales')||[]},
+  saveSale(s){const arr=this.getSales();s.id=s.id||'S'+Date.now();arr.unshift(s);this.set('sales',arr);return s},
+  getRestocks(){return this.get('restocks')||[]},
+  saveRestock(r){const arr=this.getRestocks();r.id='R'+Date.now();arr.unshift(r);this.set('restocks',arr);return r},
+  getNotifs(){return this.get('notifs')||[]},
+  addNotif(msg){const arr=this.getNotifs();arr.unshift({id:'N'+Date.now(),msg,time:new Date().toISOString(),read:false});if(arr.length>200)arr.splice(200);this.set('notifs',arr)},
+  markAllRead(){this.set('notifs',this.getNotifs().map(n=>({...n,read:true})))},
+  getBiz(){return this.get('business')||{name:'My Business',currency:'KSh',address:'',phone:''}},
+  getLowStock(){return this.getProducts().filter(p=>p.active!==false&&p.quantity<=(p.low||5))},
+  getMonthSales(){const n=new Date();return this.getSales().filter(s=>{const d=new Date(s.at);return d.getMonth()===n.getMonth()&&d.getFullYear()===n.getFullYear()})},
+  getTodaySales(){const t=new Date().toDateString();return this.getSales().filter(s=>new Date(s.at).toDateString()===t)},
+  nuke(){Object.keys(localStorage).filter(k=>k.startsWith(this.PFX)).forEach(k=>localStorage.removeItem(k))},
+  summary(){
+    const biz=this.getBiz(),sales=this.getSales(),prods=this.getProducts(),rs=this.getRestocks(),ms=this.getMonthSales();
+    const rev=ms.reduce((s,x)=>s+(x.total||0),0),cost=rs.reduce((s,x)=>s+(x.totalCost||0),0),low=this.getLowStock();
+    return{biz,totalProds:prods.filter(p=>p.active!==false).length,totalSales:sales.length,monthRev:rev,
+      restockCost:cost,lowCount:low.length,lowItems:low.map(p=>p.name),
+      topProds:prods.sort((a,b)=>(b.sold||0)-(a.sold||0)).slice(0,5).map(p=>({name:p.name,sold:p.sold||0})),
+      recentSales:sales.slice(0,20),
+      payMethods:sales.reduce((a,s)=>{a[s.pm]=(a[s.pm]||0)+(s.total||0);return a},{}),
+      currency:biz.currency||'KSh'}
+  }
+};
+
+// ═══════════════════════════════════════════════════
+//  AUTH
+// ═══════════════════════════════════════════════════
+const Auth = {
+  hash(s){let h=5381;for(let i=0;i<s.length;i++){h=((h<<5)+h)^s.charCodeAt(i);h=h>>>0}return h.toString(36)},
+  current(){const id=sessionStorage.getItem('lkc_s');return id?DB.getUser(id):null},
+  login(name,pass){const u=DB.getUsers().find(u=>u.name.toLowerCase()===name.toLowerCase()&&u.password===this.hash(pass)&&u.active!==false);if(u){sessionStorage.setItem('lkc_s',u.id);return u}return null},
+  logout(){sessionStorage.removeItem('lkc_s')},
+  isOwner(u){return u&&u.role==='owner'},
+  isMgr(u){return u&&u.role==='manager'},
+  isSales(u){return u&&u.role==='sales'},
+  canEdit(u){return u&&u.role==='owner'},
+  canReports(u){return u&&(u.role==='owner'||u.role==='manager')},
+  canAI(u){return u&&u.role==='owner'},
+  canSettings(u){return u&&u.role==='owner'},
+  canTeam(u){return u&&u.role==='owner'}
+};
+
+// ═══════════════════════════════════════════════════
+//  SETUP
+// ═══════════════════════════════════════════════════
+const Setup = {
+  ap:'',
+  s1(){
+    const p=document.getElementById('aPass').value.trim(),c=document.getElementById('aPassC').value.trim();
+    if(p.length<4)return Setup.err('Password must be at least 4 characters.');
+    if(p!==c)return Setup.err('Passwords do not match.');
+    if(DB.get('adminHash'))return Setup.err('Setup already done. Clear data to reset.');
+    Setup.ap=p;Setup.go(1,2);
+  },
+  s2(){
+    const name=document.getElementById('bName').value.trim();
+    if(!name)return Setup.err('Business name is required.');
+    DB.set('business',{name,address:document.getElementById('bAddr').value.trim(),phone:document.getElementById('bPhone').value.trim(),currency:document.getElementById('bCur').value.trim()||'KSh',kra:document.getElementById('bKRA').value.trim()});
+    const hf=document.getElementById('hfKey').value.trim();if(hf)DB.set('hfKey',hf);
+    Setup.go(2,3);
+  },
+  s3(){
+    const name=document.getElementById('oName').value.trim(),pass=document.getElementById('oPass').value.trim();
+    if(!name)return Setup.err('Owner name is required.');
+    if(pass.length<4)return Setup.err('Password must be at least 4 characters.');
+    DB.set('adminHash',Auth.hash(Setup.ap));
+    const users=DB.getUsers();
+    users.push({id:'u_'+Date.now(),name,password:Auth.hash(pass),role:'owner',active:true,at:new Date().toISOString()});
+    DB.set('users',users);DB.set('setupDone',true);
+    document.getElementById('s3').classList.add('hidden');
+    document.getElementById('setupOk').textContent='✓ Setup complete! Signing you in...';
+    document.getElementById('setupOk').classList.remove('hidden');
+    setTimeout(()=>A.login(name,pass,true),1200);
+  },
+  go(f,t){document.getElementById('s'+f).classList.add('hidden');document.getElementById('s'+t).classList.remove('hidden');document.getElementById('setupErr').classList.add('hidden')},
+  err(m){const e=document.getElementById('setupErr');e.textContent=m;e.classList.remove('hidden')}
+};
+
+// ═══════════════════════════════════════════════════
+//  MAIN APP (A)
+// ═══════════════════════════════════════════════════
+const A = {
+  cu:null,
+
+  init(){
+    if(!DB.get('setupDone')){document.getElementById('setupLink').classList.remove('hidden')}
+    document.getElementById('lgPass').addEventListener('keyup',e=>{if(e.key==='Enter')A.login()});
+    document.getElementById('lgName').addEventListener('keyup',e=>{if(e.key==='Enter')document.getElementById('lgPass').focus()});
+    const u=Auth.current();
+    if(u){this.cu=u;this.boot()}else{document.getElementById('loginWrap').classList.remove('hidden')}
+  },
+
+  login(nameArg,passArg,auto=false){
+    const name=nameArg||document.getElementById('lgName').value.trim();
+    const pass=passArg||document.getElementById('lgPass').value;
+    const err=document.getElementById('loginErr');
+    if(!name||!pass){err.textContent='Please enter your name and password.';err.classList.remove('hidden');return}
+    if(!DB.get('setupDone')){err.textContent='Please complete Admin Setup first.';err.classList.remove('hidden');return}
+    const u=Auth.login(name,pass);
+    if(!u){err.textContent='Name or password is incorrect.';err.classList.remove('hidden');document.getElementById('lgPass').value='';return}
+    this.cu=u;this.boot();
+  },
+
+  logout(){
+    Auth.logout();this.cu=null;
+    document.getElementById('appShell').classList.add('hidden');
+    document.getElementById('loginWrap').classList.remove('hidden');
+    document.getElementById('viewLogin').classList.remove('hidden');
+    document.getElementById('viewSetup').classList.add('hidden');
+    document.getElementById('lgName').value='';document.getElementById('lgPass').value='';
+    document.getElementById('loginErr').classList.add('hidden');
+  },
+
+  showSetup(){document.getElementById('viewLogin').classList.add('hidden');document.getElementById('viewSetup').classList.remove('hidden')},
+  showLogin(){document.getElementById('viewSetup').classList.add('hidden');document.getElementById('viewLogin').classList.remove('hidden')},
+
+  boot(){
+    document.getElementById('loginWrap').classList.add('hidden');
+    document.getElementById('appShell').classList.remove('hidden');
+    const u=this.cu;
+    document.getElementById('tbUser').textContent=u.name;
+    document.getElementById('userPill').innerHTML=`<strong>${u.name}</strong><span>${u.role}</span>`;
+    this.buildNav();this.updBdg();
+    if(Auth.isOwner(u))this.nav('dashboard');
+    else if(Auth.isMgr(u))this.nav('reports');
+    else this.nav('sales');
+  },
+
+  buildNav(){
+    const u=this.cu,nav=document.getElementById('sbNav');nav.innerHTML='';
+    const pages=[
+      {id:'dashboard',ic:'📊',lbl:'Dashboard',show:Auth.isOwner(u)},
+      {id:'sales',ic:'🛒',lbl:'Sales',show:true},
+      {id:'stock',ic:'📦',lbl:'Stock',show:true},
+      {id:'reports',ic:'📈',lbl:'Reports',show:Auth.canReports(u)},
+      {id:'team',ic:'👥',lbl:'Team',show:Auth.canTeam(u)},
+      {id:'ai',ic:'🤖',lbl:'AI Accountant',show:Auth.canAI(u)},
+      {id:'settings',ic:'⚙',lbl:'Settings',show:Auth.canSettings(u)},
+    ];
+    pages.forEach(p=>{
+      if(!p.show)return;
+      const btn=document.createElement('button');
+      btn.className='ni';btn.id='nav_'+p.id;
+      btn.innerHTML=`<span class="ic">${p.ic}</span>${p.lbl}`;
+      btn.onclick=()=>this.nav(p.id);
+      nav.appendChild(btn);
+    });
+    if(Auth.isOwner(u))document.getElementById('nBell').classList.remove('hidden');
+  },
+
+  nav(pg){
+    document.querySelectorAll('.ni').forEach(e=>e.classList.remove('active'));
+    const btn=document.getElementById('nav_'+pg);if(btn)btn.classList.add('active');
+    const titles={dashboard:'Dashboard',sales:'Sales',stock:'Stock',reports:'Reports',team:'Team',ai:'AI Accountant',settings:'Settings'};
+    document.getElementById('tbTitle').textContent=titles[pg]||pg;
+    const mc=document.getElementById('mc');mc.innerHTML='';
+    ({dashboard:P.dashboard,sales:P.sales,stock:P.stock,reports:P.reports,team:P.team,ai:P.ai,settings:P.settings}[pg]||P.dashboard)();
+    if(window.innerWidth<=768)document.getElementById('sidebar').classList.remove('open');
+  },
+
+  togSb(){document.getElementById('sidebar').classList.toggle('open')},
+
+  updBdg(){
+    const c=DB.getNotifs().filter(n=>!n.read).length;
+    document.getElementById('nBdg').textContent=c;
+    document.getElementById('nBell').style.opacity=c>0?'1':'0.6';
+  },
+
+  fmt(v){const c=DB.getBiz().currency||'KSh';return`${c} ${Number(v||0).toLocaleString('en-KE',{minimumFractionDigits:2,maximumFractionDigits:2})}`},
+  fmtD(iso){return new Date(iso).toLocaleDateString('en-KE',{day:'numeric',month:'short',year:'numeric'})},
+  fmtDT(iso){return new Date(iso).toLocaleString('en-KE',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})},
+  ago(iso){const d=Date.now()-new Date(iso).getTime(),m=Math.floor(d/60000);if(m<1)return'just now';if(m<60)return m+'m ago';const h=Math.floor(m/60);if(h<24)return h+'h ago';return Math.floor(h/24)+'d ago'},
+  payIco(m){return{Cash:'💵',Mpesa:'📱',Card:'💳',Cheque:'📝',Bank:'🏦',Credit:'⏳',Other:'💱'}[m]||'💱'}
+};
+
+// ═══════════════════════════════════════════════════
+//  MODAL (M) & TOAST (T)
+// ═══════════════════════════════════════════════════
+const M = {
+  open(title,body,btns=[]){
+    document.getElementById('mTitle').textContent=title;
+    document.getElementById('mBody').innerHTML=body;
+    document.getElementById('mFt').innerHTML=btns.map(b=>`<button class="btn ${b.cls||'btn-o'}" onclick="${b.fn}">${b.lbl}</button>`).join('');
+    document.getElementById('mOv').classList.remove('hidden');
+    setTimeout(()=>{const i=document.querySelector('#mBody input,#mBody select,#mBody textarea');if(i)i.focus()},80);
+  },
+  close(){document.getElementById('mOv').classList.add('hidden')},
+  ov(e){if(e.target===document.getElementById('mOv'))this.close()}
+};
+const T = {
+  show(msg,type='',ms=3200){const c=document.getElementById('toasts'),d=document.createElement('div');d.className=`toast ${type}`;d.textContent=msg;c.appendChild(d);setTimeout(()=>d.remove(),ms)},
+  ok(m){this.show(m,'ok')},err(m){this.show(m,'err')},info(m){this.show(m,'info')},warn(m){this.show(m,'warn')}
+};
+
+// ═══════════════════════════════════════════════════
+//  PAGES (P)
+// ═══════════════════════════════════════════════════
+const P = {
+
+// ─── DASHBOARD ───
+dashboard(){
+  const mc=document.getElementById('mc');
+  const biz=DB.getBiz(),sales=DB.getSales(),prods=DB.getProducts().filter(p=>p.active!==false);
+  const td=DB.getTodaySales(),ms=DB.getMonthSales(),low=DB.getLowStock();
+  const tRev=td.reduce((s,x)=>s+(x.total||0),0),mRev=ms.reduce((s,x)=>s+(x.total||0),0);
+  const payB=ms.reduce((a,s)=>{a[s.pm]=(a[s.pm]||0)+(s.total||0);return a},{});
+  mc.innerHTML=`
+    <div class="pg-hd"><div><h2>Welcome back 👋</h2><p>${biz.name} — ${new Date().toLocaleDateString('en-KE',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}</p></div>
+      <div class="pg-act"><button class="btn btn-g btn-sm" onclick="A.nav('sales')">+ Record Sale</button></div></div>
+    ${low.length?`<div class="alert a-warn mb">⚠ <strong>Low Stock:</strong> ${low.map(p=>`${p.name} (${p.quantity})`).join(', ')}</div>`:''}
+    <div class="stats-grid">
+      <div class="sc ok"><div class="sc-ico">💰</div><div class="sc-val">${A.fmt(tRev)}</div><div class="sc-lbl">Today's Revenue</div></div>
+      <div class="sc acc"><div class="sc-ico">📅</div><div class="sc-val">${A.fmt(mRev)}</div><div class="sc-lbl">This Month</div></div>
+      <div class="sc"><div class="sc-ico">🛒</div><div class="sc-val">${td.length}</div><div class="sc-lbl">Today's Sales</div></div>
+      <div class="sc bl"><div class="sc-ico">📦</div><div class="sc-val">${prods.length}</div><div class="sc-lbl">Products</div></div>
+      <div class="sc ${low.length?'red':''}"><div class="sc-ico">⚠</div><div class="sc-val">${low.length}</div><div class="sc-lbl">Low Stock</div></div>
+      <div class="sc"><div class="sc-ico">📊</div><div class="sc-val">${sales.length}</div><div class="sc-lbl">Total Sales</div></div>
+    </div>
+    <div class="g2">
+      <div class="card"><div class="card-ttl">Recent Sales</div>
+        ${!sales.length?'<div class="empty"><p>No sales yet.</p></div>':`<div class="rl">${sales.slice(0,8).map(s=>`
+          <div class="ri"><div class="rdot sale"></div><div class="ri-meta"><strong>${s.pn}</strong><span>${s.by}·${A.ago(s.at)}·${s.pm}</span></div><div class="ri-amt">${A.fmt(s.total)}</div></div>`).join('')}</div>`}
+      </div>
+      <div>
+        <div class="card mb"><div class="card-ttl">Payment Methods (Month)</div>
+          ${!Object.keys(payB).length?'<div class="empty"><p>No data.</p></div>':Object.entries(payB).map(([m,v])=>`<div class="fb" style="padding:7px 0;border-bottom:1px solid var(--border)"><span>${A.payIco(m)} ${m}</span><strong>${A.fmt(v)}</strong></div>`).join('')}
+        </div>
+        <div class="card"><div class="card-ttl">Low Stock</div>
+          ${!low.length?'<div class="empty"><p>All OK ✓</p></div>':`<div class="rl">${low.map(p=>`<div class="ri"><div class="rdot alert"></div><div class="ri-meta"><strong>${p.name}</strong><span>${p.quantity} units left</span></div><span class="bdg bdg-red">${p.quantity}</span></div>`).join('')}</div>`}
+        </div>
+      </div>
+    </div>`;
+},
+
+// ─── SALES ───
+sales(){
+  const mc=document.getElementById('mc'),u=A.cu,canEdit=Auth.canEdit(u);
+  mc.innerHTML=`
+    <div class="pg-hd"><div><h2>Sales</h2><p>Record and view transactions</p></div>
+      <div class="pg-act">
+        <button class="btn btn-p" onclick="P.newSale()">+ Record Sale</button>
+        ${canEdit?`<button class="btn btn-g btn-sm" onclick="P.newRestock()">+ Restock</button>`:''}
+      </div></div>
+    <div class="filter-bar">
+      <input class="si" placeholder="Search product, name..." oninput="P.salesFilter(this.value,'txt')"/>
+      <select style="max-width:155px" onchange="P.salesFilter(this.value,'pm')"><option value="">All Payments</option><option>Cash</option><option>Mpesa</option><option>Card</option><option>Cheque</option><option>Bank</option><option>Credit</option><option>Other</option></select>
+      <select style="max-width:130px" onchange="P.salesFilter(this.value,'dt')"><option value="">All Time</option><option value="today">Today</option><option value="week">This Week</option><option value="month">This Month</option></select>
+    </div>
+    <div class="card"><div class="tw" id="salesTbl"></div></div>`;
+  P._sf={txt:'',pm:'',dt:''};P.renderSalesTbl();
+},
+
+_sf:{txt:'',pm:'',dt:''},
+salesFilter(v,k){P._sf[k]=v;P.renderSalesTbl()},
+
+renderSalesTbl(){
+  const u=A.cu,canEdit=Auth.canEdit(u);
+  let s=DB.getSales();
+  if(Auth.isSales(u))s=s.filter(x=>x.uid===u.id);
+  if(P._sf.txt){const t=P._sf.txt.toLowerCase();s=s.filter(x=>(x.pn||'').toLowerCase().includes(t)||(x.by||'').toLowerCase().includes(t)||(x.id||'').toLowerCase().includes(t))}
+  if(P._sf.pm)s=s.filter(x=>x.pm===P._sf.pm);
+  if(P._sf.dt){const now=new Date();s=s.filter(x=>{const d=new Date(x.at);if(P._sf.dt==='today')return d.toDateString()===now.toDateString();if(P._sf.dt==='week'){const w=new Date(now);w.setDate(now.getDate()-7);return d>=w}if(P._sf.dt==='month')return d.getMonth()===now.getMonth()&&d.getFullYear()===now.getFullYear();return true})}
+  const el=document.getElementById('salesTbl');if(!el)return;
+  if(!s.length){el.innerHTML='<div class="empty"><div class="ei">🛒</div><p>No sales found.</p></div>';return}
+  el.innerHTML=`<table><thead><tr><th>Sale ID</th><th>Product</th><th>Qty</th><th>Unit Price</th><th>Total</th><th>Payment</th><th>Sold By</th><th>Date/Time</th><th>Actions</th></tr></thead><tbody>
+    ${s.map(x=>`<tr>
+      <td class="sm muted">${x.id}</td><td><strong>${x.pn}</strong></td><td>${x.qty}</td>
+      <td>${A.fmt(x.up)}</td><td><strong>${A.fmt(x.total)}</strong></td>
+      <td><span class="bdg bdg-info">${A.payIco(x.pm)} ${x.pm}</span></td>
+      <td>${x.by}</td><td>${A.fmtDT(x.at)}</td>
+      <td style="white-space:nowrap">
+        <button class="btn btn-o btn-sm" onclick="P.printInv('${x.id}')">🖨 Invoice</button>
+        ${canEdit?`<button class="btn btn-d btn-sm" onclick="P.delSale('${x.id}')">Del</button>`:''}
+      </td></tr>`).join('')}
+  </tbody></table>`;
+},
+
+newSale(){
+  const prods=DB.getProducts().filter(p=>p.active!==false&&p.quantity>0);
+  if(!prods.length)return T.warn('No products in stock. Add products first.');
+  M.open('Record New Sale',`
+    <div class="fg"><label>Product</label>
+      <select id="sp" onchange="P._spChg()"><option value="">— Select product —</option>
+        ${prods.map(p=>`<option value="${p.id}" data-price="${p.sp}" data-stock="${p.quantity}">${p.name} (${p.quantity} in stock)</option>`).join('')}
+      </select></div>
+    <div id="spInfo" class="alert a-info hidden"></div>
+    <div class="g2">
+      <div class="fg"><label>Quantity</label><input type="number" id="sq" min="1" value="1" oninput="P._calcT()"/></div>
+      <div class="fg"><label>Unit Price</label><input type="number" id="sup" min="0" step="0.01" placeholder="Auto-filled" oninput="P._calcT()"/></div>
+    </div>
+    <div class="fg"><label>Payment Method</label>
+      <select id="spm"><option>Cash</option><option>Mpesa</option><option>Card</option><option>Cheque</option><option>Bank</option><option>Credit</option><option>Other</option></select></div>
+    <div class="fg"><label>Customer Name <span class="lh">(optional)</span></label><input type="text" id="scust" placeholder="Walk-in customer"/></div>
+    <div class="fg"><label>Notes <span class="lh">(optional)</span></label><input type="text" id="snotes" placeholder="Any notes..."/></div>
+    <div class="card" style="background:var(--green-pale);border-color:var(--green)">
+      <div class="fb"><span class="bold">Total:</span><span id="stotal" style="font-family:var(--fd);font-size:18px;color:var(--green)">${DB.getBiz().currency} 0.00</span></div>
+    </div>`,
+    [{lbl:'Cancel',cls:'btn-o',fn:'M.close()'},{lbl:'Record Sale ✓',cls:'btn-p',fn:'P.saveSale()'}]);
+},
+_spChg(){const s=document.getElementById('sp'),o=s.options[s.selectedIndex];if(!o.value)return;document.getElementById('sup').value=o.dataset.price;document.getElementById('spInfo').textContent=`${o.dataset.stock} units available`;document.getElementById('spInfo').classList.remove('hidden');P._calcT()},
+_calcT(){const q=parseFloat(document.getElementById('sq')?.value)||0,p=parseFloat(document.getElementById('sup')?.value)||0,el=document.getElementById('stotal');if(el)el.textContent=A.fmt(q*p)},
+
+saveSale(){
+  const pid=document.getElementById('sp').value,qty=parseInt(document.getElementById('sq').value),up=parseFloat(document.getElementById('sup').value),pm=document.getElementById('spm').value;
+  if(!pid)return T.err('Select a product.');if(!qty||qty<1)return T.err('Qty must be at least 1.');if(!up||up<=0)return T.err('Enter a valid price.');
+  const prod=DB.getProduct(pid);if(!prod)return T.err('Product not found.');if(prod.quantity<qty)return T.err(`Only ${prod.quantity} in stock.`);
+  const sale={id:'S'+Date.now(),pid,pn:prod.name,qty,up,total:qty*up,pm,cust:document.getElementById('scust').value.trim()||'Walk-in',notes:document.getElementById('snotes').value.trim(),by:A.cu.name,uid:A.cu.id,at:new Date().toISOString()};
+  DB.saveSale(sale);DB.updStock(pid,-qty);
+  const arr=DB.getProducts(),idx=arr.findIndex(p=>p.id===pid);if(idx>=0){arr[idx].sold=(arr[idx].sold||0)+qty;DB.set('products',arr)}
+  DB.addNotif(`🛒 ${A.cu.name} sold ${qty}× ${prod.name} for ${A.fmt(qty*up)} via ${pm}`);
+  const upd=DB.getProduct(pid);if(upd&&upd.quantity<=(upd.low||5))DB.addNotif(`⚠ Low stock: ${prod.name} has only ${upd.quantity} units left.`);
+  A.updBdg();M.close();T.ok(`Sale recorded — ${A.fmt(qty*up)}`);P.renderSalesTbl();
+},
+
+delSale(id){
+  if(!confirm('Delete this sale? Cannot be undone.'))return;
+  DB.set('sales',DB.getSales().filter(s=>s.id!==id));T.ok('Sale deleted.');P.renderSalesTbl();
+},
+
+newRestock(){
+  const prods=DB.getProducts().filter(p=>p.active!==false);
+  M.open('Record Restock',`
+    <div class="fg"><label>Product</label><select id="rp"><option value="">— Select —</option>${prods.map(p=>`<option value="${p.id}">${p.name} (${p.quantity} current)</option>`).join('')}</select></div>
+    <div class="g2">
+      <div class="fg"><label>Quantity Added</label><input type="number" id="rq" min="1" value="1"/></div>
+      <div class="fg"><label>Cost/Unit</label><input type="number" id="rc" min="0" step="0.01" placeholder="0.00"/></div>
+    </div>
+    <div class="fg"><label>Supplier <span class="lh">(optional)</span></label><input type="text" id="rs" placeholder="Supplier name"/></div>
+    <div class="fg"><label>Notes</label><input type="text" id="rn" placeholder="Invoice no., etc."/></div>`,
+    [{lbl:'Cancel',cls:'btn-o',fn:'M.close()'},{lbl:'Save Restock',cls:'btn-p',fn:'P.saveRestock()'}]);
+},
+saveRestock(){
+  const pid=document.getElementById('rp').value,qty=parseInt(document.getElementById('rq').value),cost=parseFloat(document.getElementById('rc').value)||0;
+  if(!pid)return T.err('Select a product.');if(!qty||qty<1)return T.err('Qty must be at least 1.');
+  const prod=DB.getProduct(pid);
+  DB.saveRestock({pid,pn:prod.name,qty,cpu:cost,totalCost:qty*cost,supplier:document.getElementById('rs').value.trim(),notes:document.getElementById('rn').value.trim(),by:A.cu.name,at:new Date().toISOString()});
+  DB.updStock(pid,qty);DB.addNotif(`📦 ${A.cu.name} restocked ${qty}× ${prod.name}`);A.updBdg();M.close();T.ok(`Restock saved — ${qty} units added.`);P.renderSalesTbl();
+},
+
+// ─── STOCK ───
+stock(){
+  const mc=document.getElementById('mc'),canEdit=Auth.canEdit(A.cu);
+  mc.innerHTML=`
+    <div class="pg-hd"><div><h2>Stock</h2><p>Product inventory</p></div>
+      <div class="pg-act">${canEdit?`<button class="btn btn-p" onclick="P.newProd()">+ Add Product</button>`:''}</div></div>
+    ${!canEdit?'<div class="alert a-info mb">View only. Contact the owner to make changes.</div>':''}
+    <div class="filter-bar">
+      <input class="si" placeholder="Search products..." oninput="P.stockFilter(this.value)"/>
+      <select style="max-width:130px" onchange="P.stockStatus(this.value)"><option value="">All Status</option><option value="low">Low Stock</option><option value="out">Out of Stock</option></select>
+    </div>
+    <div class="card"><div class="tw" id="stockTbl"></div></div>`;
+  P._stf='';P._stsf='';P.renderStockTbl();
+},
+_stf:'',_stsf:'',
+stockFilter(v){P._stf=v.toLowerCase();P.renderStockTbl()},
+stockStatus(v){P._stsf=v;P.renderStockTbl()},
+renderStockTbl(){
+  const canEdit=Auth.canEdit(A.cu);
+  let prods=DB.getProducts().filter(p=>p.active!==false);
+  if(P._stf)prods=prods.filter(p=>(p.name||'').toLowerCase().includes(P._stf)||(p.cat||'').toLowerCase().includes(P._stf)||(p.sku||'').toLowerCase().includes(P._stf));
+  if(P._stsf==='low')prods=prods.filter(p=>p.quantity>0&&p.quantity<=(p.low||5));
+  if(P._stsf==='out')prods=prods.filter(p=>p.quantity<=0);
+  const el=document.getElementById('stockTbl');if(!el)return;
+  if(!prods.length){el.innerHTML=`<div class="empty"><div class="ei">📦</div><p>No products found.</p>${canEdit?'<br><button class="btn btn-p" onclick="P.newProd()">Add First Product</button>':''}</div>`;return}
+  el.innerHTML=`<table><thead><tr><th>Product</th><th>SKU</th><th>Category</th><th>In Stock</th>${canEdit?'<th>Cost</th>':''}<th>Sell Price</th><th>Status</th><th>Total Sold</th>${canEdit?'<th>Actions</th>':''}</tr></thead><tbody>
+    ${prods.map(p=>{const st=p.quantity<=0?'out':p.quantity<=(p.low||5)?'low':'ok';return`<tr>
+      <td><strong>${p.name}</strong></td><td class="muted sm">${p.sku||'—'}</td><td>${p.cat||'—'}</td>
+      <td><strong ${st!=='ok'?'style="color:var(--red)"':''}>${p.quantity}</strong></td>
+      ${canEdit?`<td>${A.fmt(p.cp||0)}</td>`:''}
+      <td>${A.fmt(p.sp||0)}</td>
+      <td>${P.stBdg(st)}</td><td>${p.sold||0}</td>
+      ${canEdit?`<td><button class="btn btn-o btn-sm" onclick="P.editProd('${p.id}')">Edit</button> <button class="btn btn-d btn-sm" onclick="P.delProd('${p.id}')">Del</button></td>`:''}
+    </tr>`}).join('')}
+  </tbody></table>`;
+},
+stBdg(st){return st==='out'?'<span class="bdg bdg-red">Out</span>':st==='low'?'<span class="bdg bdg-warn">Low</span>':'<span class="bdg bdg-ok">OK</span>'},
+
+prodForm(p={}){return`
+  <div class="fg"><label>Product Name *</label><input type="text" id="pn" value="${p.name||''}"/></div>
+  <div class="g2">
+    <div class="fg"><label>SKU</label><input type="text" id="psku" value="${p.sku||''}"/></div>
+    <div class="fg"><label>Category</label><input type="text" id="pcat" value="${p.cat||''}"/></div>
+  </div>
+  <div class="g2">
+    <div class="fg"><label>Cost Price</label><input type="number" id="pcp" value="${p.cp||''}" min="0" step="0.01" placeholder="0.00"/></div>
+    <div class="fg"><label>Selling Price *</label><input type="number" id="psp" value="${p.sp||''}" min="0" step="0.01" placeholder="0.00"/></div>
+  </div>
+  <div class="g2">
+    <div class="fg"><label>Stock Qty *</label><input type="number" id="pqty" value="${p.quantity||0}" min="0"/></div>
+    <div class="fg"><label>Low Stock Alert At</label><input type="number" id="plow" value="${p.low||5}" min="0"/></div>
+  </div>`},
+
+newProd(){M.open('Add Product',P.prodForm(),[{lbl:'Cancel',cls:'btn-o',fn:'M.close()'},{lbl:'Add Product',cls:'btn-p',fn:"P.saveProd()"}])},
+editProd(id){const p=DB.getProduct(id);if(!p)return;M.open('Edit Product',P.prodForm(p),[{lbl:'Cancel',cls:'btn-o',fn:'M.close()'},{lbl:'Save',cls:'btn-p',fn:`P.saveProd('${id}')`}])},
+saveProd(eid=null){
+  const name=document.getElementById('pn').value.trim(),sp=parseFloat(document.getElementById('psp').value)||0;
+  if(!name)return T.err('Name required.');if(sp<=0)return T.err('Selling price must be > 0.');
+  const p={name,sku:document.getElementById('psku').value.trim(),cat:document.getElementById('pcat').value.trim(),cp:parseFloat(document.getElementById('pcp').value)||0,sp,quantity:parseInt(document.getElementById('pqty').value)||0,low:parseInt(document.getElementById('plow').value)||5,active:true};
+  if(eid){const ex=DB.getProduct(eid);if(ex){p.id=eid;p.sold=ex.sold||0;p.at=ex.at||new Date().toISOString();DB.saveProduct(p);T.ok('Product updated.')}}
+  else{p.id='P'+Date.now();p.sold=0;p.at=new Date().toISOString();DB.saveProduct(p);T.ok('Product added.')}
+  M.close();P.renderStockTbl();
+},
+delProd(id){const p=DB.getProduct(id);if(!p||!confirm(`Delete "${p.name}"?`))return;DB.delProduct(id);T.ok('Deleted.');P.renderStockTbl()},
+
+// ─── REPORTS ───
+reports(){
+  const mc=document.getElementById('mc');
+  mc.innerHTML=`
+    <div class="pg-hd"><div><h2>Reports</h2><p>Financial & inventory summaries</p></div>
+      <div class="pg-act"><button class="btn btn-o btn-sm" onclick="window.print()">🖨 Print</button></div></div>
+    <div style="display:flex;gap:7px;margin-bottom:18px;flex-wrap:wrap">
+      <button class="btn btn-p btn-sm" id="rtab_s" onclick="P.rTab('s')">Sales</button>
+      <button class="btn btn-o btn-sm" id="rtab_st" onclick="P.rTab('st')">Stock</button>
+      <button class="btn btn-o btn-sm" id="rtab_inv" onclick="P.rTab('inv')">Invoices</button>
+      ${Auth.isOwner(A.cu)?`<button class="btn btn-o btn-sm" id="rtab_vat" onclick="P.rTab('vat')">VAT/PAYE</button>`:''}
+    </div>
+    <div id="rBody"></div>`;
+  P._rt='s';P.rRender();
+},
+_rt:'s',
+rTab(t){
+  ['s','st','inv','vat'].forEach(x=>{const b=document.getElementById('rtab_'+x);if(b)b.className='btn btn-o btn-sm'});
+  const b=document.getElementById('rtab_'+t);if(b)b.className='btn btn-p btn-sm';
+  P._rt=t;P.rRender();
+},
+rFilter(sales,range){const now=new Date();return sales.filter(s=>{const d=new Date(s.at);if(range==='today')return d.toDateString()===now.toDateString();if(range==='week'){const w=new Date(now);w.setDate(now.getDate()-7);return d>=w}if(range==='month')return d.getMonth()===now.getMonth()&&d.getFullYear()===now.getFullYear();return true})},
+rRender(){
+  const el=document.getElementById('rBody');if(!el)return;
+  const rangeSel=`<div class="filter-bar mb"><select id="rRange" onchange="P.rRender()" style="max-width:150px"><option value="month">This Month</option><option value="week">This Week</option><option value="today">Today</option><option value="all">All Time</option></select></div>`;
+  if(P._rt==='s'){
+    el.innerHTML=rangeSel+'<div id="rContent"></div>';
+    const range=document.getElementById('rRange')?.value||'month';
+    const sales=P.rFilter(DB.getSales(),range);
+    const rev=sales.reduce((s,x)=>s+(x.total||0),0),byPay=sales.reduce((a,s)=>{a[s.pm]=(a[s.pm]||0)+(s.total||0);return a},{}),bySel=sales.reduce((a,s)=>{a[s.by]=(a[s.by]||0)+(s.total||0);return a},{}),byProd=sales.reduce((a,s)=>{if(!a[s.pn])a[s.pn]={q:0,r:0};a[s.pn].q+=s.qty;a[s.pn].r+=s.total;return a},{});
+    document.getElementById('rContent').innerHTML=`
+      <div class="stats-grid">
+        <div class="sc ok"><div class="sc-ico">💰</div><div class="sc-val">${A.fmt(rev)}</div><div class="sc-lbl">Revenue</div></div>
+        <div class="sc"><div class="sc-ico">🛒</div><div class="sc-val">${sales.length}</div><div class="sc-lbl">Transactions</div></div>
+        <div class="sc acc"><div class="sc-ico">📊</div><div class="sc-val">${A.fmt(sales.length?rev/sales.length:0)}</div><div class="sc-lbl">Avg Sale</div></div>
+      </div>
+      <div class="g2">
+        <div class="card"><div class="card-ttl">By Payment Method</div>${Object.entries(byPay).map(([m,v])=>`<div class="fb" style="padding:7px 0;border-bottom:1px solid var(--border)"><span>${m}</span><strong>${A.fmt(v)}</strong></div>`).join('')||'<p class="muted">No data.</p>'}</div>
+        <div class="card"><div class="card-ttl">By Team Member</div>${Object.entries(bySel).map(([n,v])=>`<div class="fb" style="padding:7px 0;border-bottom:1px solid var(--border)"><span>${n}</span><strong>${A.fmt(v)}</strong></div>`).join('')||'<p class="muted">No data.</p>'}</div>
+      </div>
+      <div class="card mt"><div class="card-ttl">Top Products</div><div class="tw"><table><thead><tr><th>Product</th><th>Units</th><th>Revenue</th></tr></thead><tbody>
+        ${Object.entries(byProd).sort((a,b)=>b[1].r-a[1].r).slice(0,15).map(([n,d])=>`<tr><td>${n}</td><td>${d.q}</td><td>${A.fmt(d.r)}</td></tr>`).join('')||'<tr><td colspan="3" class="muted" style="text-align:center">No data.</td></tr>'}
+      </tbody></table></div></div>`;
+  } else if(P._rt==='st'){
+    const prods=DB.getProducts().filter(p=>p.active!==false);
+    const cv=prods.reduce((s,p)=>s+(p.quantity*(p.cp||0)),0),sv=prods.reduce((s,p)=>s+(p.quantity*(p.sp||0)),0);
+    el.innerHTML=`<div class="stats-grid">
+      <div class="sc"><div class="sc-ico">📦</div><div class="sc-val">${prods.length}</div><div class="sc-lbl">Products</div></div>
+      <div class="sc bl"><div class="sc-ico">💰</div><div class="sc-val">${A.fmt(cv)}</div><div class="sc-lbl">Cost Value</div></div>
+      <div class="sc ok"><div class="sc-ico">📈</div><div class="sc-val">${A.fmt(sv)}</div><div class="sc-lbl">Sell Value</div></div>
+      <div class="sc red"><div class="sc-ico">⚠</div><div class="sc-val">${DB.getLowStock().length}</div><div class="sc-lbl">Low Stock</div></div>
+    </div>
+    <div class="card"><div class="card-ttl">Full Stock List</div><div class="tw"><table><thead><tr><th>Product</th><th>SKU</th><th>Category</th><th>Qty</th><th>Cost/Unit</th><th>Sell/Unit</th><th>Stock Value</th><th>Status</th></tr></thead><tbody>
+      ${prods.map(p=>{const st=p.quantity<=0?'out':p.quantity<=(p.low||5)?'low':'ok';return`<tr><td><strong>${p.name}</strong></td><td>${p.sku||'—'}</td><td>${p.cat||'—'}</td><td ${st!=='ok'?'style="color:var(--red);font-weight:600"':''}>${p.quantity}</td><td>${A.fmt(p.cp||0)}</td><td>${A.fmt(p.sp||0)}</td><td>${A.fmt(p.quantity*(p.cp||0))}</td><td>${P.stBdg(st)}</td></tr>`}).join('')}
+    </tbody></table></div></div>`;
+  } else if(P._rt==='inv'){
+    el.innerHTML=rangeSel+'<div id="rContent"></div>';
+    const range=document.getElementById('rRange')?.value||'month';
+    const sales=P.rFilter(DB.getSales(),range);
+    document.getElementById('rContent').innerHTML=`<div class="card"><div class="card-ttl">Invoice List</div><div class="tw"><table><thead><tr><th>ID</th><th>Product</th><th>Qty</th><th>Total</th><th>Payment</th><th>Customer</th><th>By</th><th>Date</th><th>PDF</th></tr></thead><tbody>
+      ${sales.length?sales.map(s=>`<tr><td class="sm muted">${s.id}</td><td>${s.pn}</td><td>${s.qty}</td><td><strong>${A.fmt(s.total)}</strong></td><td>${s.pm}</td><td>${s.cust||'Walk-in'}</td><td>${s.by}</td><td>${A.fmtD(s.at)}</td><td><button class="btn btn-o btn-sm" onclick="P.printInv('${s.id}')">🖨 PDF</button></td></tr>`).join(''):'<tr><td colspan="9" class="muted" style="text-align:center;padding:20px">No sales in this period.</td></tr>'}
+    </tbody></table></div></div>`;
+  } else if(P._rt==='vat'){
+    const biz=DB.getBiz(),ms=DB.getMonthSales(),rev=ms.reduce((s,x)=>s+(x.total||0),0);
+    const vatAmt=rev*0.16/(1+0.16),net=rev-vatAmt;
+    el.innerHTML=`<div class="card"><div class="card-ttl">VAT/PAYE Summary — ${new Date().toLocaleDateString('en-KE',{month:'long',year:'numeric'})}</div>
+      <div class="alert a-warn">⚠ Estimate only. Consult a certified accountant for official filings.</div>
+      <div class="g2">
+        <div>
+          <h4 style="color:var(--green);margin-bottom:10px">VAT (16%)</h4>
+          <div class="fb" style="padding:7px 0;border-bottom:1px solid var(--border)"><span>Gross Revenue</span><strong>${A.fmt(rev)}</strong></div>
+          <div class="fb" style="padding:7px 0;border-bottom:1px solid var(--border)"><span>VAT Collected</span><strong style="color:var(--red)">${A.fmt(vatAmt)}</strong></div>
+          <div class="fb" style="padding:7px 0"><span>Net Revenue</span><strong style="color:#15803d">${A.fmt(net)}</strong></div>
+        </div>
+        <div>
+          <h4 style="color:var(--green);margin-bottom:10px">KRA Info</h4>
+          <p class="muted sm">PIN: ${biz.kra||'Not set (add in Settings)'}</p>
+          <p class="muted sm" style="margin-top:7px">VAT Return: Due 20th of following month</p>
+          <p class="muted sm" style="margin-top:7px">File at: <a href="https://itax.kra.go.ke" target="_blank">iTax Portal</a></p>
+        </div>
+      </div></div>`;
+  }
+},
+
+// ─── TEAM ───
+team(){
+  const mc=document.getElementById('mc');
+  const users=DB.getUsers().filter(u=>u.active!==false);
+  mc.innerHTML=`
+    <div class="pg-hd"><div><h2>Team</h2><p>Manage access and roles</p></div>
+      <div class="pg-act"><button class="btn btn-p" onclick="P.newUser()">+ Add Member</button></div></div>
+    <div class="alert a-info mb">
+      <strong>Roles:</strong> 👑 <strong>Owner</strong> — full access &nbsp;|&nbsp; 📋 <strong>Manager</strong> — reports & stock view &nbsp;|&nbsp; 🛒 <strong>Sales</strong> — record sales & view stock
+    </div>
+    <div class="card">
+      ${!users.length?'<div class="empty"><p>No team members.</p></div>':`<div class="tw"><table><thead><tr><th>Name</th><th>Role</th><th>Added</th><th>Actions</th></tr></thead><tbody>
+        ${users.map(u=>`<tr>
+          <td><strong>${u.name}</strong></td>
+          <td><span class="r-${u.role}">${{owner:'👑 Owner',manager:'📋 Manager',sales:'🛒 Sales'}[u.role]}</span></td>
+          <td>${A.fmtD(u.at||new Date().toISOString())}</td>
+          <td>${u.id===A.cu.id?'<span class="muted sm">You</span>':`<button class="btn btn-o btn-sm" onclick="P.editUser('${u.id}')">Edit</button> <button class="btn btn-d btn-sm" onclick="P.delUser('${u.id}')">Remove</button>`}</td>
+        </tr>`).join('')}
+      </tbody></table></div>`}
+    </div>
+    <div class="card mt"><div class="card-ttl">Permissions Summary</div><div class="tw"><table>
+      <thead><tr><th>Feature</th><th>Owner</th><th>Manager</th><th>Sales</th></tr></thead>
+      <tbody>${[['Dashboard','✅','❌','❌'],['Record Sales','✅','❌','✅'],['Record Restocks','✅','❌','✅'],['View Stock','✅','✅','✅'],['Edit/Delete','✅','❌','❌'],['Reports','✅','✅','❌'],['AI Accountant','✅','❌','❌'],['Team Mgmt','✅','❌','❌'],['Settings','✅','❌','❌'],['Notifications','✅','❌','❌']].map(r=>`<tr>${r.map((c,i)=>`<td ${i>0?'style="text-align:center"':''}>${c}</td>`).join('')}</tr>`).join('')}</tbody>
+    </table></div></div>`;
+},
+
+userForm(u={}){return`
+  <div class="fg"><label>Full Name *</label><input type="text" id="un" value="${u.name||''}"/></div>
+  <div class="fg"><label>Role *</label><select id="ur">
+    <option value="sales" ${u.role==='sales'?'selected':''}>🛒 Sales Person</option>
+    <option value="manager" ${u.role==='manager'?'selected':''}>📋 Manager</option>
+    <option value="owner" ${u.role==='owner'?'selected':''}>👑 Owner</option>
+  </select></div>
+  <div class="fg"><label>Password ${u.id?'<span class="lh">(leave blank to keep)</span>':' *'}</label><input type="password" id="up" placeholder="${u.id?'Leave blank to keep':'Min 4 characters'}"/></div>`},
+newUser(){M.open('Add Team Member',P.userForm(),[{lbl:'Cancel',cls:'btn-o',fn:'M.close()'},{lbl:'Add Member',cls:'btn-p',fn:'P.saveUser()'}])},
+editUser(id){const u=DB.getUser(id);if(!u)return;M.open('Edit Member',P.userForm(u),[{lbl:'Cancel',cls:'btn-o',fn:'M.close()'},{lbl:'Save',cls:'btn-p',fn:`P.saveUser('${id}')`}])},
+saveUser(eid=null){
+  const name=document.getElementById('un').value.trim(),role=document.getElementById('ur').value,pass=document.getElementById('up').value;
+  if(!name)return T.err('Name required.');
+  if(!eid&&pass.length<4)return T.err('Password must be at least 4 characters.');
+  if(eid){const u=DB.getUser(eid);if(!u)return;u.name=name;u.role=role;if(pass&&pass.length>=4)u.password=Auth.hash(pass);DB.saveUser(u);T.ok('Updated.')}
+  else{if(DB.getUsers().find(u=>u.name.toLowerCase()===name.toLowerCase()))return T.err('User with this name already exists.');DB.getUsers();const users=DB.getUsers();users.push({id:'u_'+Date.now(),name,role,password:Auth.hash(pass),active:true,at:new Date().toISOString()});DB.set('users',users);T.ok('Member added.')}
+  M.close();P.team();
+},
+delUser(id){const u=DB.getUser(id);if(!u||u.id===A.cu.id)return;if(!confirm(`Remove ${u.name}?`))return;DB.delUser(id);T.ok('Removed.');P.team()},
+
+// ─── AI ───
+ai(){
+  const mc=document.getElementById('mc'),hfKey=DB.get('hfKey');
+  P._aiMsgs=[];
+  mc.innerHTML=`
+    <div class="pg-hd"><div><h2>🤖 AI Accountant</h2><p>Reads your business data. Ask anything.</p></div>
+      <div class="pg-act"><button class="btn btn-o btn-sm" onclick="P.aiClear()">Clear</button><button class="btn btn-o btn-sm" onclick="P.aiSetup()">⚙ API Key</button></div></div>
+    ${!hfKey?'<div class="alert a-warn">No API key set. Click ⚙ API Key to add your free Hugging Face token.</div>':''}
+    <div class="ai-wrap card" style="padding:0">
+      <div class="ai-msgs" id="aiMsgs">
+        <div class="ai-msg bot">👋 Hello! I'm your AI Accountant. I have access to all your business data — ask me anything about sales, stock, revenue, VAT, or fraud detection.</div>
+      </div>
+      <div class="ai-in-row">
+        <input type="text" id="aiIn" placeholder="Ask about your business finances..." onkeyup="if(event.key==='Enter')P.aiSend()"/>
+        <button class="btn btn-p" id="aiBtn" onclick="P.aiSend()">Send</button>
+      </div>
+    </div>`;
+},
+_aiMsgs:[],
+_aiLoading:false,
+
+aiSysProm(){
+  const s=DB.summary(),b=s.biz;
+  return`You are a professional AI accountant for ${b.name}. Be concise and practical. Currency: ${b.currency||'KSh'}.
+
+LIVE BUSINESS DATA:
+- Business: ${b.name} | ${b.address||''} | ${b.phone||''} | KRA: ${b.kra||'N/A'}
+- Products: ${s.totalProds} | Total Sales: ${s.totalSales}
+- This Month Revenue: ${b.currency} ${s.monthRev.toFixed(2)}
+- Restock Cost (all time): ${b.currency} ${s.restockCost.toFixed(2)}
+- Low Stock (${s.lowCount}): ${s.lowItems.join(', ')||'None'}
+- Top Products: ${s.topProds.map(p=>`${p.name}(${p.sold})`).join(', ')||'N/A'}
+- Payment Breakdown: ${JSON.stringify(s.payMethods)}
+- Recent 20 Sales: ${JSON.stringify(s.recentSales.map(x=>({p:x.pn,q:x.qty,t:x.total,m:x.pm,by:x.by,d:x.at?.split('T')[0]})))}
+
+KENYA TAX: VAT 16% (due 20th next month, iTax). PAYE: 10% up to KSh 24k, 25% next 8,333, 30% above.
+
+Use the data above to answer accurately. For fraud detection, look for anomalies, duplicate-seeming entries, or unusual patterns in the recent sales.`;
+},
+
+async aiSend(){
+  const inp=document.getElementById('aiIn'),text=inp?.value.trim();
+  if(!text||P._aiLoading)return;
+  const hfKey=DB.get('hfKey');
+  if(!hfKey)return T.err('Add your Hugging Face API key first.');
+  inp.value='';P._aiLoading=true;
+  const btn=document.getElementById('aiBtn');if(btn){btn.disabled=true;btn.textContent='...'}
+  P._aiMsgs.push({r:'user',c:text});P.aiAppend('user',text);
+  const tid=P.aiAppend('bot','⏳ Thinking...',true);
+  try{
+    const conv=P._aiMsgs.slice(-6).map(m=>`${m.r==='user'?'User':'Assistant'}: ${m.c}`).join('\n')+'\nAssistant:';
+    const prompt=`<s>[INST] <<SYS>>\n${P.aiSysProm()}\n<</SYS>>\n\n${conv} [/INST]`;
+    const res=await fetch('https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.2',{method:'POST',headers:{'Authorization':`Bearer ${hfKey}`,'Content-Type':'application/json'},body:JSON.stringify({inputs:prompt,parameters:{max_new_tokens:600,temperature:0.7,top_p:0.9,do_sample:true,return_full_text:false}})});
+    const data=await res.json();
+    document.getElementById(tid)?.remove();
+    if(data.error){
+      const msg=data.error.includes('loading')?'⏳ Model warming up (~20s). Try again shortly.':data.error.includes('token')||res.status===401?'❌ Invalid API key.':'❌ Error: '+data.error;
+      P.aiAppend('bot',msg);
+    } else {
+      let reply=(data[0]?.generated_text||'').trim();
+      if(reply.includes('[/INST]'))reply=reply.split('[/INST]').pop().trim();
+      if(reply.includes('Assistant:'))reply=reply.split('Assistant:').pop().trim();
+      if(!reply)reply="I couldn't generate a response. Please try again.";
+      P._aiMsgs.push({r:'bot',c:reply});P.aiAppend('bot',reply);
+    }
+  }catch(e){document.getElementById(tid)?.remove();P.aiAppend('bot','❌ Connection error. Check your internet and API key.')}
+  P._aiLoading=false;const btn2=document.getElementById('aiBtn');if(btn2){btn2.disabled=false;btn2.textContent='Send'}
+},
+aiAppend(role,text,isTyping=false){
+  const c=document.getElementById('aiMsgs');if(!c)return null;
+  const id='am_'+Date.now()+Math.random().toString(36).slice(2);
+  const d=document.createElement('div');d.className=`ai-msg ${role}${isTyping?' typing':''}`;d.id=id;
+  d.innerHTML=text.replace(/\n/g,'<br>');c.appendChild(d);c.scrollTop=c.scrollHeight;return id;
+},
+aiClear(){P._aiMsgs=[];const c=document.getElementById('aiMsgs');if(c)c.innerHTML='<div class="ai-msg bot">Chat cleared. How can I help?</div>'},
+aiSetup(){const cur=DB.get('hfKey')||'';M.open('AI Accountant Setup',`
+  <p class="muted" style="margin-bottom:14px">Uses <strong>Mistral-7B</strong> via Hugging Face — free, no billing.</p>
+  <div class="fg"><label>Hugging Face API Key</label><input type="text" id="hfIn" value="${cur}" placeholder="hf_xxxxxxxxxxxxxxxxxxxxxxxx"/>
+  <small>Get free at <a href="https://huggingface.co/settings/tokens" target="_blank">huggingface.co/settings/tokens</a> → New Token → Read.</small></div>`,
+  [{lbl:'Cancel',cls:'btn-o',fn:'M.close()'},{lbl:'Save Key',cls:'btn-p',fn:'P.aiSaveKey()'}])},
+aiSaveKey(){const k=document.getElementById('hfIn').value.trim();if(!k)return T.err('Enter your API key.');DB.set('hfKey',k);M.close();T.ok('API key saved!');P.ai()},
+
+// ─── NOTIFICATIONS ───
+notifications(){
+  const notifs=DB.getNotifs();
+  const html=!notifs.length?'<div class="empty"><p>No notifications yet.</p></div>':`
+    <div style="max-height:380px;overflow-y:auto">
+      ${notifs.slice(0,40).map(n=>`<div style="padding:10px 0;border-bottom:1px solid var(--border);font-size:13px;${!n.read?'background:var(--green-pale);padding:9px 11px;border-radius:7px;margin-bottom:3px':''}">
+        <div>${n.msg}</div><div class="sm muted">${A.ago(n.time)}</div></div>`).join('')}
+    </div>
+    <div class="mt" style="text-align:right"><button class="btn btn-o btn-sm" onclick="DB.markAllRead();A.updBdg();M.close()">Mark all read</button></div>`;
+  M.open('Notifications',html,[]);DB.markAllRead();A.updBdg();
+},
+
+// ─── SETTINGS ───
+settings(){
+  const mc=document.getElementById('mc'),biz=DB.getBiz();
+  mc.innerHTML=`
+    <div class="pg-hd"><div><h2>Settings</h2><p>Business & account configuration</p></div></div>
+    <div class="g2">
+      <div class="card">
+        <div class="card-ttl">Business Information</div>
+        <div class="fg"><label>Business Name</label><input type="text" id="sbn" value="${biz.name||''}"/></div>
+        <div class="fg"><label>Address</label><input type="text" id="sba" value="${biz.address||''}"/></div>
+        <div class="fg"><label>Phone</label><input type="text" id="sbp" value="${biz.phone||''}"/></div>
+        <div class="fg"><label>Currency</label><input type="text" id="sbc" value="${biz.currency||'KSh'}"/></div>
+        <div class="fg"><label>KRA PIN</label><input type="text" id="sbk" value="${biz.kra||''}" placeholder="P051234567X"/></div>
+        <button class="btn btn-p" onclick="P.saveBiz()">Save Business Info</button>
+      </div>
+      <div>
+        <div class="card mb">
+          <div class="card-ttl">Change My Password</div>
+          <div class="fg"><label>Current Password</label><input type="password" id="sop"/></div>
+          <div class="fg"><label>New Password</label><input type="password" id="snp" placeholder="Min 4 characters"/></div>
+          <div class="fg"><label>Confirm New</label><input type="password" id="snpc"/></div>
+          <button class="btn btn-p" onclick="P.changePass()">Update Password</button>
+        </div>
+        <div class="card">
+          <div class="card-ttl">App Info</div>
+          <div class="fb" style="padding:6px 0;border-bottom:1px solid var(--border)"><span class="muted">Version</span><span>LKC Accounting v2.0</span></div>
+          <div class="fb" style="padding:6px 0;border-bottom:1px solid var(--border)"><span class="muted">Storage</span><span>Browser localStorage</span></div>
+          <div class="fb" style="padding:6px 0;border-bottom:1px solid var(--border)"><span class="muted">Sales Records</span><span>${DB.getSales().length}</span></div>
+          <div class="fb" style="padding:6px 0;border-bottom:1px solid var(--border)"><span class="muted">Products</span><span>${DB.getProducts().length}</span></div>
+          <div class="fb" style="padding:6px 0"><span class="muted">Team Members</span><span>${DB.getUsers().length}</span></div>
+          <div class="divider"></div>
+          <button class="btn btn-d btn-sm" onclick="P.nukeData()">🗑 Clear All App Data</button>
+        </div>
+      </div>
+    </div>`;
+},
+saveBiz(){
+  const name=document.getElementById('sbn').value.trim();if(!name)return T.err('Name required.');
+  DB.set('business',{name,address:document.getElementById('sba').value.trim(),phone:document.getElementById('sbp').value.trim(),currency:document.getElementById('sbc').value.trim()||'KSh',kra:document.getElementById('sbk').value.trim()});
+  T.ok('Saved!');
+},
+changePass(){
+  const old=document.getElementById('sop').value,np=document.getElementById('snp').value,npc=document.getElementById('snpc').value;
+  const u=A.cu;if(Auth.hash(old)!==u.password)return T.err('Current password incorrect.');
+  if(np.length<4)return T.err('Min 4 characters.');if(np!==npc)return T.err("Passwords don't match.");
+  u.password=Auth.hash(np);DB.saveUser(u);A.cu=u;T.ok('Password updated!');
+  document.getElementById('sop').value='';document.getElementById('snp').value='';document.getElementById('snpc').value='';
+},
+nukeData(){
+  if(!confirm('Delete ALL data? This cannot be undone.'))return;
+  if(prompt('Type "DELETE EVERYTHING" to confirm:')!=='DELETE EVERYTHING')return T.err('Aborted.');
+  DB.nuke();T.ok('Data cleared. Reloading...');setTimeout(()=>location.reload(),1500);
+},
+
+// ─── INVOICE PDF ───
+printInv(saleId){
+  const s=DB.getSales().find(x=>x.id===saleId);if(!s)return T.err('Sale not found.');
+  const b=DB.getBiz();
+  const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Invoice ${s.id}</title><style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Segoe UI',Arial,sans-serif;background:#fff;color:#1c1a16;padding:40px;max-width:660px;margin:0 auto}
+  .hd{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:36px;padding-bottom:18px;border-bottom:3px solid #1b4332}
+  .bn{font-size:24px;font-weight:700;color:#1b4332}.bd{font-size:11px;color:#5c584f;margin-top:5px;line-height:1.8}
+  .il h2{font-size:26px;color:#b5650a;letter-spacing:2px;text-transform:uppercase;text-align:right}
+  .il p{font-size:12px;color:#5c584f;text-align:right;margin-top:3px}
+  .sec{margin-bottom:24px}.sec-lbl{font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:#8c8880;margin-bottom:6px;font-weight:600}
+  .cbox{background:#f4f1ec;border-radius:7px;padding:12px 16px;font-size:14px}
+  table{width:100%;border-collapse:collapse;margin-bottom:18px}
+  thead tr{background:#1b4332;color:#fff}
+  th{padding:9px 12px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.06em}
+  td{padding:10px 12px;border-bottom:1px solid #ebe7de;font-size:13px}
+  tr:last-child td{border-bottom:none}
+  .tot{float:right;width:240px}.tot td{padding:5px 0;border:none;font-size:13px}
+  .tot-fin{font-size:17px;font-weight:700;color:#1b4332;border-top:2px solid #1b4332;padding-top:7px!important}
+  .pbdg{display:inline-block;background:#e8f0eb;color:#1b4332;padding:3px 11px;border-radius:99px;font-size:11px;font-weight:600;margin-top:3px}
+  .foot{margin-top:44px;padding-top:14px;border-top:1px solid #ebe7de;text-align:center;font-size:11px;color:#8c8880}
+  .cf::after{content:'';display:table;clear:both}
+  @media print{body{padding:16px}@page{margin:1cm;size:A4}}
+  </style></head><body>
+  <div class="hd">
+    <div><div class="bn">${b.name}</div><div class="bd">${b.address?b.address+'<br>':''}${b.phone?'Tel: '+b.phone+'<br>':''}${b.kra?'KRA PIN: '+b.kra:''}</div></div>
+    <div class="il"><h2>Invoice</h2><p># ${s.id}</p><p>${new Date(s.at).toLocaleDateString('en-KE',{day:'numeric',month:'long',year:'numeric'})}</p><p>${new Date(s.at).toLocaleTimeString('en-KE',{hour:'2-digit',minute:'2-digit'})}</p></div>
+  </div>
+  <div class="sec"><div class="sec-lbl">Bill To</div><div class="cbox"><strong>${s.cust||'Walk-in Customer'}</strong></div></div>
+  <table><thead><tr><th>Description</th><th style="text-align:center">Qty</th><th style="text-align:right">Unit Price</th><th style="text-align:right">Amount</th></tr></thead>
+  <tbody><tr><td>${s.pn}${s.notes?`<br><small style="color:#8c8880">${s.notes}</small>`:''}</td><td style="text-align:center">${s.qty}</td><td style="text-align:right">${b.currency} ${Number(s.up).toFixed(2)}</td><td style="text-align:right"><strong>${b.currency} ${Number(s.total).toFixed(2)}</strong></td></tr></tbody></table>
+  <div class="cf"><table class="tot"><tr><td>Subtotal</td><td style="text-align:right">${b.currency} ${Number(s.total).toFixed(2)}</td></tr><tr><td colspan="2" style="border-top:1px solid #ebe7de;padding-top:5px!important"></td></tr><tr><td class="tot-fin">TOTAL</td><td class="tot-fin" style="text-align:right">${b.currency} ${Number(s.total).toFixed(2)}</td></tr></table></div>
+  <div style="margin-top:28px"><div class="sec-lbl">Payment</div>
+    <div>Method: <span class="pbdg">${s.pm}</span></div>
+    <div style="margin-top:7px;font-size:12px;color:#5c584f">Served by: ${s.by}</div>
+  </div>
+  <div class="foot">Thank you for your business!<br>${b.name}${b.phone?' — '+b.phone:''}${b.address?' — '+b.address:''}</div>
+  <script>window.onload=()=>window.print()<\/script>
+  </body></html>`;
+  const w=window.open('','_blank','width=700,height=880');w.document.write(html);w.document.close();
+}
+
+}; // end P
+
+// ═══════════════════════════════════════════════════
+//  BOOT
+// ═══════════════════════════════════════════════════
+window.addEventListener('DOMContentLoaded', () => A.init());
+</script>
+</body>
+</html>
