@@ -3,13 +3,13 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>LKC Accounting</title>
+<title>Biashara Books</title>
 
 <!-- PWA Meta Tags -->
-<meta name="application-name" content="LKC Accounting"/>
+<meta name="application-name" content="Biashara Books"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
-<meta name="apple-mobile-web-app-title" content="LKC Accounting"/>
+<meta name="apple-mobile-web-app-title" content="Biashara Books"/>
 <meta name="description" content="Business accounting and sales management"/>
 <meta name="theme-color" content="#1b4332"/>
 <meta name="mobile-web-app-capable" content="yes"/>
@@ -228,7 +228,7 @@ tr:last-child td{border-bottom:none}tbody tr:hover{background:var(--bg)}
 <!-- SPLASH -->
 <div id="splash" class="splash">
   <div class="splash-ico">₦</div>
-  <h1>LKC Accounting</h1>
+  <h1>Biashara Books</h1>
   <div class="spin"></div>
   <p id="splashMsg">Starting up...</p>
 </div>
@@ -316,7 +316,7 @@ create table if not exists devices(id text primary key, token text, authorized_a
   <div class="auth-card">
     <div class="brand-row">
       <div class="brand-ico">₦</div>
-      <h1>LKC Accounting</h1>
+      <h1>Biashara Books</h1>
       <p id="lgBizName">Business Management</p>
     </div>
 
@@ -680,7 +680,7 @@ const App = {
   },
 
   _showLogin(cfg) {
-    document.getElementById('lgBizName').textContent = cfg?.business?.name || 'LKC Accounting';
+    document.getElementById('lgBizName').textContent = cfg?.business?.name || 'Biashara Books';
     show('loginScreen');
     this.showPane(Auth.isDeviceAuthorized() ? 'loginPane' : 'linkPane');
     document.getElementById('lgPass').addEventListener('keyup', e => { if(e.key==='Enter') App.login(); });
@@ -1466,7 +1466,7 @@ async settings(){
         </div>
         <div class="card">
           <div class="card-ttl">App Info</div>
-          <div class="fb" style="padding:5px 0;border-bottom:1px solid var(--border)"><span class="muted">Version</span><span>LKC Accounting v4.0</span></div>
+          <div class="fb" style="padding:5px 0;border-bottom:1px solid var(--border)"><span class="muted">Version</span><span>Biashara Books v4.0</span></div>
           <div class="fb" style="padding:5px 0;border-bottom:1px solid var(--border)"><span class="muted">Database</span><span>Supabase (PostgreSQL)</span></div>
           <div class="fb" style="padding:5px 0;border-bottom:1px solid var(--border)"><span class="muted">AI</span><span>Groq — Llama 3 (free)</span></div>
           <div class="fb" style="padding:5px 0;border-bottom:1px solid var(--border)"><span class="muted">This Device</span><span class="mono">${Auth.deviceToken()}</span></div>
@@ -1565,7 +1565,7 @@ const PWA = {
   async install() {
     if (!this._prompt) {
       // Show manual instructions if prompt not available (iOS / already installed)
-      M.open('📲 Install LKC Accounting', `
+      M.open('📲 Install Biashara Books', `
         <div class="alert a-info" style="margin-bottom:14px">Install this app on your device for quick access — works offline for viewing.</div>
         <div style="margin-bottom:16px">
           <div class="bold mb" style="color:var(--green)">📱 Android (Chrome)</div>
