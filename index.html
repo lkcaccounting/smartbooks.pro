@@ -4,6 +4,23 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>LKC Accounting</title>
+
+<!-- PWA Meta Tags -->
+<meta name="application-name" content="LKC Accounting"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="LKC Accounting"/>
+<meta name="description" content="Business accounting and sales management"/>
+<meta name="theme-color" content="#1b4332"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+
+<!-- PWA Icons (inline SVG as data URI for single-file) -->
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Crect width='192' height='192' rx='40' fill='%231b4332'/%3E%3Ctext x='96' y='130' font-size='110' text-anchor='middle' fill='white' font-family='Georgia'%3E₦%3C/text%3E%3C/svg%3E"/>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Crect width='192' height='192' rx='40' fill='%231b4332'/%3E%3Ctext x='96' y='130' font-size='110' text-anchor='middle' fill='white' font-family='Georgia'%3E₦%3C/text%3E%3C/svg%3E"/>
+
+<!-- PWA Manifest (inline) -->
+<link rel="manifest" href="data:application/manifest+json,%7B%22name%22%3A%22LKC%20Accounting%22%2C%22short_name%22%3A%22LKC%22%2C%22description%22%3A%22Business%20accounting%20and%20sales%20management%22%2C%22start_url%22%3A%22.%2F%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%231b4332%22%2C%22theme_color%22%3A%22%231b4332%22%2C%22orientation%22%3A%22portrait-primary%22%2C%22icons%22%3A%5B%7B%22src%22%3A%22data%3Aimage%2Fsvg%2Bxml%2C%253Csvg%2520xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%2520viewBox%3D'0%25200%2520192%2520192'%253E%253Crect%2520width%3D'192'%2520height%3D'192'%2520rx%3D'40'%2520fill%3D'%25231b4332'%2F%253E%253Ctext%2520x%3D'96'%2520y%3D'130'%2520font-size%3D'110'%2520text-anchor%3D'middle'%2520fill%3D'white'%253E%25E2%2582%25A6%253C%2Ftext%253E%253C%2Fsvg%253E%22%2C%22sizes%22%3A%22192x192%22%2C%22type%22%3A%22image%2Fsvg%2Bxml%22%7D%5D%7D"/>
+
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -360,6 +377,7 @@ create table if not exists devices(id text primary key, token text, authorized_a
     <div class="tb-title" id="tbTitle">Dashboard</div>
     <div class="tb-right">
       <div class="sync-ind"><div class="sdot" id="sdot"></div><span id="stxt" style="font-size:11px;color:var(--text3)">Ready</span></div>
+      <button id="installBtn" class="btn btn-sm btn-g hidden" onclick="PWA.install()" title="Install as app" style="padding:4px 10px;font-size:12px">⬇ Install App</button>
       <div id="nBell" class="notif-bell hidden" onclick="P.notifications()">🔔<span class="notif-bdg" id="nBdg">0</span></div>
       <span class="tb-user" id="tbUser"></span>
     </div>
@@ -945,31 +963,59 @@ async delSale(id){
   await SB.delete('sales',`id=eq.${id}`);T.ok('Sale deleted.');P.sales();
 },
 
-async newRestock(){
-  let prods;try{prods=await SB.select('products','active=eq.true');}catch(e){return T.err('Could not load products.');}
-  M.open('Record Restock',`
-    <div class="fg"><label>Product</label><select id="rp"><option value="">— Select —</option>${prods.map(p=>`<option value="${p.id}" data-qty="${p.quantity}">${p.name} (${p.quantity} current)</option>`).join('')}</select></div>
-    <div class="g2">
-      <div class="fg"><label>Qty Added</label><input type="number" id="rq" min="1" value="1"/></div>
-      <div class="fg"><label>Cost/Unit</label><input type="number" id="rc" min="0" step="0.01" placeholder="0.00"/></div>
-    </div>
-    <div class="fg"><label>Supplier <span class="lh">(optional)</span></label><input type="text" id="rs"/></div>
-    <div class="fg"><label>Notes</label><input type="text" id="rn" placeholder="Invoice no., etc."/></div>`,
-    [{lbl:'Cancel',cls:'btn-o',fn:'M.close()'},{lbl:'Save Restock',cls:'btn-p',fn:'P.saveRestock()'}]);
+async newRestock(preselectId=null){
+  let prods;try{prods=await SB.select('products','active=eq.true','name.asc');}catch(e){return T.err('Could not load products.');}
+  if(!prods.length)return T.warn('No products found. Add products first.');
   P._rsProds=prods;
+  M.open('Add Stock / Restock',`
+    <div class="alert a-info" style="font-size:12px">⚠ This adds units to an <strong>existing product</strong>. Use <em>Add New Product</em> only for items never stocked before.</div>
+    <div class="fg"><label>Which Product? *</label>
+      <select id="rp" onchange="P._rsChg()"><option value="">— Select product —</option>
+        ${prods.map(p=>`<option value="${p.id}" data-qty="${p.quantity}" data-name="${p.name}" ${preselectId===p.id?'selected':''}>${p.name} — ${p.quantity} units currently in stock</option>`).join('')}
+      </select></div>
+    <div id="rsPreview" class="hidden" style="background:var(--green-pale);border:1px solid var(--green);border-radius:8px;padding:12px;margin-bottom:13px;font-size:13px">
+      <div class="fb"><span>Current stock:</span><strong id="rsCurrent">0</strong></div>
+      <div class="fb"><span>Adding:</span><strong id="rsAdding" style="color:var(--green)">0</strong></div>
+      <div class="fb" style="border-top:1px solid var(--border);margin-top:6px;padding-top:6px"><span class="bold">New total will be:</span><strong id="rsNew" style="font-size:16px;color:var(--green)">0</strong></div>
+    </div>
+    <div class="g2">
+      <div class="fg"><label>Quantity to Add *</label><input type="number" id="rq" min="1" value="1" oninput="P._rsChg()"/></div>
+      <div class="fg"><label>Cost Per Unit</label><input type="number" id="rc" min="0" step="0.01" placeholder="0.00"/></div>
+    </div>
+    <div class="fg"><label>Supplier <span class="lh">(optional)</span></label><input type="text" id="rs" placeholder="e.g. Nairobi Wholesalers"/></div>
+    <div class="fg"><label>Notes <span class="lh">(optional)</span></label><input type="text" id="rn" placeholder="Invoice no., delivery note, etc."/></div>`,
+    [{lbl:'Cancel',cls:'btn-o',fn:'M.close()'},{lbl:'Add Stock ✓',cls:'btn-p',fn:'P.saveRestock()'}]);
+},
+
+_rsChg(){
+  const sel=document.getElementById('rp'),opt=sel.options[sel.selectedIndex];
+  const qty=parseInt(document.getElementById('rq')?.value)||0;
+  const preview=document.getElementById('rsPreview');
+  if(!opt||!opt.value){if(preview)preview.classList.add('hidden');return;}
+  const current=parseInt(opt.dataset.qty)||0;
+  document.getElementById('rsCurrent').textContent=current+' units';
+  document.getElementById('rsAdding').textContent='+'+qty+' units';
+  document.getElementById('rsNew').textContent=(current+qty)+' units';
+  if(preview)preview.classList.remove('hidden');
 },
 
 async saveRestock(){
   const pid=document.getElementById('rp').value,qty=parseInt(document.getElementById('rq').value),cost=parseFloat(document.getElementById('rc').value)||0;
   if(!pid)return T.err('Select a product.');if(!qty||qty<1)return T.err('Qty must be at least 1.');
-  const prod=(P._rsProds||[]).find(p=>p.id===pid)||{name:'Product',quantity:0};
+  // Get fresh product data to avoid stale quantity
+  let prod;
+  try{const rows=await SB.select('products',`id=eq.${pid}`);prod=rows[0];}
+  catch(e){return T.err('Could not verify product: '+e.message);}
+  if(!prod)return T.err('Product not found.');
   const btn=document.querySelector('#mFt .btn-p');if(btn){btn.disabled=true;btn.textContent='Saving...';}
   try{
+    const newQty=Number(prod.quantity)+qty;
     await SB.insert('restocks',{id:SB.genId('R'),product_id:pid,product_name:prod.name,quantity:qty,cost_per_unit:cost,total_cost:qty*cost,supplier:document.getElementById('rs').value.trim(),notes:document.getElementById('rn').value.trim(),recorded_by:App.cu.name});
-    await SB.update('products',`id=eq.${pid}`,{quantity:Number(prod.quantity)+qty});
-    await SB.insert('notifications',{id:SB.genId('N'),message:`📦 ${App.cu.name} restocked ${qty}× ${prod.name}`,type:'restock',read_by:''});
-    M.close();T.ok(`Restock saved — ${qty} units added.`);
-  }catch(e){T.err('Error: '+e.message);if(btn){btn.disabled=false;btn.textContent='Save Restock';}}
+    await SB.update('products',`id=eq.${pid}`,{quantity:newQty});
+    await SB.insert('notifications',{id:SB.genId('N'),message:`📦 ${App.cu.name} restocked ${qty}× ${prod.name} → now ${newQty} in stock`,type:'restock',read_by:''});
+    M.close();T.ok(`✓ ${qty} units added to ${prod.name}. New stock: ${newQty}`);
+    P.stock();
+  }catch(e){T.err('Error: '+e.message);if(btn){btn.disabled=false;btn.textContent='Add Stock ✓';}}
 },
 
 // ─── STOCK ───
@@ -977,7 +1023,14 @@ async stock(){
   const mc=document.getElementById('mc'),canEdit=App.cu.role==='owner';
   mc.innerHTML=`
     <div class="pg-hd"><div><h2>Stock</h2><p>Product inventory</p></div>
-      <div class="pg-act">${canEdit?`<button class="btn btn-p" onclick="P.newProd()">+ Add Product</button>`:''}</div></div>
+      <div class="pg-act">
+        ${canEdit?`
+          <button class="btn btn-p" onclick="P.newRestock()" style="background:var(--green2)">📦 Restock Existing</button>
+          <button class="btn btn-o btn-sm" onclick="P.newProd()">+ Add New Product</button>
+          <button class="btn btn-o btn-sm" onclick="P.mergeDuplicates()" title="Merge products with same name">🔀 Merge Duplicates</button>
+        `:''}
+      </div></div>
+    ${canEdit?`<div class="alert a-warn mb sm">⚠ <strong>Got more stock?</strong> Use <strong>📦 Restock Existing</strong> to add units to a product already in the list. Only use <em>Add New Product</em> for a completely new item you've never stocked before.</div>`:''}
     ${!canEdit?'<div class="alert a-info mb sm">View only — contact the owner to make changes.</div>':''}
     <div class="filter-bar">
       <input class="si" placeholder="Search products..." oninput="P.setStF('txt',this.value)"/>
@@ -1035,14 +1088,83 @@ async saveProd(eid=null){
   const data={name,sku:document.getElementById('psku').value.trim(),category:document.getElementById('pcat').value.trim(),cost_price:parseFloat(document.getElementById('pcp').value)||0,selling_price:sp,quantity:parseInt(document.getElementById('pqty').value)||0,low_alert:parseInt(document.getElementById('plow').value)||5};
   const btn=document.querySelector('#mFt .btn-p');if(btn){btn.disabled=true;btn.textContent='Saving...';}
   try{
-    if(eid){await SB.update('products',`id=eq.${eid}`,data);T.ok('Product updated.');}
-    else{await SB.insert('products',{...data,id:SB.genId('P'),active:true,total_sold:0});T.ok('Product added.');}
+    if(eid){
+      await SB.update('products',`id=eq.${eid}`,data);T.ok('Product updated.');
+    } else {
+      // Block duplicate product names — search in loaded list first, fallback to DB
+      const loaded=P._stProds||[];
+      const existingLocal=loaded.find(p=>p.name.toLowerCase()===name.toLowerCase());
+      if(existingLocal){
+        if(btn){btn.disabled=false;btn.textContent='Add Product';}
+        M.close();
+        // Offer to restock directly
+        setTimeout(()=>{
+          if(confirm(`"${name}" already exists with ${existingLocal.quantity} units.\n\nDo you want to ADD MORE STOCK to it instead?`)){
+            P._stProds=loaded;
+            P._rsProds=loaded;
+            P.newRestock(existingLocal.id);
+          }
+        },100);
+        return;
+      }
+      // Also check DB for safety
+      const existing=await SB.select('products',`active=eq.true`);
+      const dup=existing.find(p=>p.name.toLowerCase()===name.toLowerCase());
+      if(dup){
+        if(btn){btn.disabled=false;btn.textContent='Add Product';}
+        M.close();
+        setTimeout(()=>{
+          if(confirm(`"${name}" already exists with ${dup.quantity} units.\n\nDo you want to ADD MORE STOCK to it instead?`)){
+            P._stProds=existing;P._rsProds=existing;P.newRestock(dup.id);
+          }
+        },100);
+        return;
+      }
+      await SB.insert('products',{...data,id:SB.genId('P'),active:true,total_sold:0});
+      T.ok('Product added.');
+    }
     M.close();P.stock();
   }catch(e){T.err('Error: '+e.message);if(btn){btn.disabled=false;btn.textContent='Save';}}
 },
 async delProd(id,name){
   if(!confirm(`Delete "${name}"?`))return;
   await SB.update('products',`id=eq.${id}`,{active:false});T.ok('Product removed.');P.stock();
+},
+
+async mergeDuplicates(){
+  const prods=await SB.select('products','active=eq.true','name.asc');
+  // Find groups with same name
+  const groups={};
+  prods.forEach(p=>{const k=p.name.toLowerCase().trim();if(!groups[k])groups[k]=[];groups[k].push(p);});
+  const dups=Object.entries(groups).filter(([,g])=>g.length>1);
+
+  if(!dups.length){T.ok('No duplicate products found. Everything looks clean!');return;}
+
+  let html=`<p class="muted sm mb">The following products share the same name. Select which pairs to merge — their stock quantities will be combined.</p>`;
+  dups.forEach(([name,group])=>{
+    const total=group.reduce((s,p)=>s+Number(p.quantity||0),0);
+    html+=`<div class="card mb" style="padding:14px">
+      <div class="bold" style="margin-bottom:8px;color:var(--green)">${group[0].name}</div>
+      ${group.map(p=>`<div class="fb sm" style="padding:4px 0;border-bottom:1px solid var(--border)"><span>ID: ...${p.id.slice(-6)}</span><span>${p.quantity} units | Sold: ${p.total_sold||0}</span></div>`).join('')}
+      <div class="fb mt" style="font-size:13px"><span>Combined total: <strong>${total} units</strong></span>
+        <button class="btn btn-p btn-sm" onclick="P.doMerge(${JSON.stringify(group.map(p=>p.id))},${JSON.stringify(group.map(p=>p.quantity))},${JSON.stringify(group.map(p=>p.total_sold||0))})">Merge These →</button>
+      </div>
+    </div>`;
+  });
+  M.open('🔀 Merge Duplicate Products', html, [{lbl:'Close',cls:'btn-o',fn:'M.close()'}]);
+},
+
+async doMerge(ids,qtys,solds){
+  if(!confirm(`Merge ${ids.length} products into one? The first product will keep all combined stock. The others will be deleted.`))return;
+  const totalQty=qtys.reduce((a,q)=>a+Number(q),0);
+  const totalSold=solds.reduce((a,s)=>a+Number(s),0);
+  // Keep first, update with combined qty
+  await SB.update('products',`id=eq.${ids[0]}`,{quantity:totalQty,total_sold:totalSold});
+  // Delete the rest
+  for(let i=1;i<ids.length;i++){
+    await SB.update('products',`id=eq.${ids[i]}`,{active:false});
+  }
+  M.close();T.ok('Products merged successfully!');P.stock();
 },
 
 // ─── REPORTS ───
@@ -1420,7 +1542,171 @@ function hideSplash(){document.getElementById('splash').classList.add('hidden');
 function show(id){['splash','connScreen','setupScreen','loginScreen','appShell'].forEach(s=>document.getElementById(s).classList.add('hidden'));document.getElementById(id).classList.remove('hidden');}
 function setSyncState(state){const d=document.getElementById('sdot'),t=document.getElementById('stxt');if(!d)return;if(state==='busy'){d.className='sdot busy';if(t)t.textContent='Syncing...';}else if(state==='err'){d.className='sdot err';if(t)t.textContent='Error';}else{d.className='sdot';if(t)t.textContent='Ready';}}
 
-window.addEventListener('DOMContentLoaded',()=>App.boot());
+// ══════════════════════════════════════════════════════
+//  PWA INSTALL
+// ══════════════════════════════════════════════════════
+const PWA = {
+  _prompt: null,
+
+  init() {
+    window.addEventListener('beforeinstallprompt', e => {
+      e.preventDefault();
+      this._prompt = e;
+      const btn = document.getElementById('installBtn');
+      if (btn) btn.classList.remove('hidden');
+    });
+    window.addEventListener('appinstalled', () => {
+      const btn = document.getElementById('installBtn');
+      if (btn) btn.classList.add('hidden');
+      T.ok('✓ App installed successfully!');
+    });
+  },
+
+  async install() {
+    if (!this._prompt) {
+      // Show manual instructions if prompt not available (iOS / already installed)
+      M.open('📲 Install LKC Accounting', `
+        <div class="alert a-info" style="margin-bottom:14px">Install this app on your device for quick access — works offline for viewing.</div>
+        <div style="margin-bottom:16px">
+          <div class="bold mb" style="color:var(--green)">📱 Android (Chrome)</div>
+          <ol style="padding-left:18px;font-size:13px;color:var(--text2);line-height:2.2">
+            <li>Tap the <strong>⋮ menu</strong> (top right of Chrome)</li>
+            <li>Tap <strong>"Add to Home screen"</strong> or <strong>"Install app"</strong></li>
+            <li>Tap <strong>Add / Install</strong> to confirm</li>
+          </ol>
+        </div>
+        <div class="mb">
+          <div class="bold mb" style="color:var(--green)">🍎 iPhone / iPad (Safari)</div>
+          <ol style="padding-left:18px;font-size:13px;color:var(--text2);line-height:2.2">
+            <li>Tap the <strong>Share button</strong> (box with arrow at bottom)</li>
+            <li>Scroll down and tap <strong>"Add to Home Screen"</strong></li>
+            <li>Tap <strong>Add</strong> to confirm</li>
+          </ol>
+        </div>
+        <div>
+          <div class="bold mb" style="color:var(--green)">💻 Desktop (Chrome / Edge)</div>
+          <ol style="padding-left:18px;font-size:13px;color:var(--text2);line-height:2.2">
+            <li>Look for the <strong>install icon</strong> in the address bar (⊕ or computer icon)</li>
+            <li>Click it and select <strong>Install</strong></li>
+          </ol>
+        </div>`, [{lbl:'Got it',cls:'btn-p',fn:'M.close()'}]);
+      return;
+    }
+    const result = await this._prompt.prompt();
+    if (result?.outcome === 'accepted') {
+      this._prompt = null;
+      const btn = document.getElementById('installBtn');
+      if (btn) btn.classList.add('hidden');
+    }
+  }
+};
+
+// Register service worker for PWA
+if ('serviceWorker' in navigator) {
+  const swCode = `
+self.addEventListener('install', e => self.skipWaiting());
+self.addEventListener('activate', e => clients.claim());
+self.addEventListener('fetch', e => {
+  if (e.request.mode === 'navigate') {
+    e.respondWith(fetch(e.request).catch(() => caches.match('/')));
+  }
+});`;
+  const blob = new Blob([swCode], {type:'application/javascript'});
+  navigator.serviceWorker.register(URL.createObjectURL(blob)).catch(()=>{});
+}
+
+window.addEventListener('DOMContentLoaded',()=>{App.boot();PWA.init();});
+
+// ══════════════════════════════════════════════════════
+//  PWA — Install prompt
+// ══════════════════════════════════════════════════════
+let _installPrompt = null;
+
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  _installPrompt = e;
+  // Show install button if visible
+  const btn = document.getElementById('installBtn');
+  if (btn) btn.classList.remove('hidden');
+});
+
+window.addEventListener('appinstalled', () => {
+  _installPrompt = null;
+  const btn = document.getElementById('installBtn');
+  if (btn) btn.classList.add('hidden');
+  T.ok('✓ App installed successfully!');
+});
+
+function installApp() {
+  if (_installPrompt) {
+    _installPrompt.prompt();
+    _installPrompt.userChoice.then(result => {
+      if (result.outcome === 'accepted') T.ok('Installing app...');
+      _installPrompt = null;
+    });
+  } else {
+    // Fallback instructions
+    M.open('Add to Home Screen', `
+      <div style="text-align:center;margin-bottom:16px">
+        <div style="font-size:48px;margin-bottom:8px">📱</div>
+        <p class="muted sm">Follow these steps for your device:</p>
+      </div>
+      <div class="card mb" style="border-left:4px solid var(--green)">
+        <div class="bold" style="margin-bottom:8px">🤖 Android (Chrome)</div>
+        <ol style="padding-left:18px;font-size:13px;color:var(--text2);line-height:2.2">
+          <li>Tap the <strong>⋮ menu</strong> (top right)</li>
+          <li>Tap <strong>"Add to Home screen"</strong></li>
+          <li>Tap <strong>"Add"</strong> to confirm</li>
+        </ol>
+      </div>
+      <div class="card mb" style="border-left:4px solid var(--blue)">
+        <div class="bold" style="margin-bottom:8px">🍎 iPhone / iPad (Safari)</div>
+        <ol style="padding-left:18px;font-size:13px;color:var(--text2);line-height:2.2">
+          <li>Tap the <strong>Share button</strong> (□↑ at bottom)</li>
+          <li>Scroll down and tap <strong>"Add to Home Screen"</strong></li>
+          <li>Tap <strong>"Add"</strong> to confirm</li>
+        </ol>
+      </div>
+      <div class="card" style="border-left:4px solid var(--gold)">
+        <div class="bold" style="margin-bottom:8px">💻 Desktop (Chrome/Edge)</div>
+        <ol style="padding-left:18px;font-size:13px;color:var(--text2);line-height:2.2">
+          <li>Click the <strong>install icon</strong> (⊕) in the address bar</li>
+          <li>Click <strong>"Install"</strong></li>
+        </ol>
+      </div>`, []);
+  }
+}
+
+// Register service worker for offline support
+if ('serviceWorker' in navigator) {
+  const swCode = `
+    const CACHE = 'lkc-v1';
+    const OFFLINE_URLS = [self.location.pathname];
+    self.addEventListener('install', e => {
+      e.waitUntil(caches.open(CACHE).then(c => c.addAll(OFFLINE_URLS)));
+      self.skipWaiting();
+    });
+    self.addEventListener('activate', e => {
+      e.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))));
+      self.clients.claim();
+    });
+    self.addEventListener('fetch', e => {
+      if (e.request.method !== 'GET') return;
+      if (e.request.url.includes('supabase.co') || e.request.url.includes('groq.com') || e.request.url.includes('googleapis.com')) return;
+      e.respondWith(caches.match(e.request).then(cached => cached || fetch(e.request).then(res => {
+        if (res.ok && e.request.url === self.location.origin + self.location.pathname) {
+          const clone = res.clone();
+          caches.open(CACHE).then(c => c.put(e.request, clone));
+        }
+        return res;
+      }).catch(() => caches.match(OFFLINE_URLS[0]))));
+    });`;
+  const blob = new Blob([swCode], { type: 'application/javascript' });
+  const swUrl = URL.createObjectURL(blob);
+  navigator.serviceWorker.register(swUrl, { scope: './' })
+    .then(() => console.log('LKC SW registered'))
+    .catch(e => console.log('SW error:', e));
+}
 </script>
 </body>
 </html>
