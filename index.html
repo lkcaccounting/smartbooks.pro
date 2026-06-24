@@ -3,13 +3,13 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Biashara Books</title>
+<title>Smart Books</title>
 
 <!-- PWA Meta Tags -->
-<meta name="application-name" content="Biashara Books"/>
+<meta name="application-name" content="Smart Books"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
-<meta name="apple-mobile-web-app-title" content="Biashara Books"/>
+<meta name="apple-mobile-web-app-title" content="Smart Books"/>
 <meta name="description" content="Business accounting and sales management"/>
 <meta name="theme-color" content="#1b4332"/>
 <meta name="mobile-web-app-capable" content="yes"/>
@@ -92,7 +92,7 @@ small{color:var(--text3);font-size:11px;display:block;margin-top:3px}small a{col
 /* ALERTS */
 .alert{padding:10px 13px;border-radius:var(--r);font-size:13px;margin-bottom:14px}
 .a-err{background:var(--red-pale);color:var(--red);border:1px solid #fecaca}
-.a-ok{background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0}
+.a-ok{background:#f0fdf4;color:#15803d;border:1px solid #SBf7d0}
 .a-info{background:var(--blue-pale);color:var(--blue);border:1px solid #bfdbfe}
 .a-warn{background:var(--gold-pale);color:var(--gold);border:1px solid #fed7aa}
 
@@ -228,7 +228,7 @@ tr:last-child td{border-bottom:none}tbody tr:hover{background:var(--bg)}
 <!-- SPLASH -->
 <div id="splash" class="splash">
   <div class="splash-ico">₦</div>
-  <h1>Biashara Books</h1>
+  <h1>Smart Books</h1>
   <div class="spin"></div>
   <p id="splashMsg">Starting up...</p>
 </div>
@@ -316,7 +316,7 @@ create table if not exists devices(id text primary key, token text, authorized_a
   <div class="auth-card">
     <div class="brand-row">
       <div class="brand-ico">₦</div>
-      <h1>Biashara Books</h1>
+      <h1>Smart Books</h1>
       <p id="lgBizName">Business Management</p>
     </div>
 
@@ -363,8 +363,8 @@ create table if not exists devices(id text primary key, token text, authorized_a
 <!-- APP SHELL -->
 <div id="appShell" class="app-shell hidden">
   <aside class="sidebar" id="sidebar">
-    <div class="sb-brand"><div class="sb-ico">₦</div><span>BB</span></div>
-    <div class="sb-biz" id="sbBiz"></div>
+    <div class="sb-brand"><div class="sb-ico">₦</div><span>SB</span></div>
+    <div class="sb-biz" id="sSBiz"></div>
     <nav class="sb-nav" id="sbNav"></nav>
     <div class="sb-foot">
       <div class="user-pill" id="userPill"></div>
@@ -680,7 +680,7 @@ const App = {
   },
 
   _showLogin(cfg) {
-    document.getElementById('lgBizName').textContent = cfg?.business?.name || 'Biashara Books';
+    document.getElementById('lgBizName').textContent = cfg?.business?.name || 'Smart Books';
     show('loginScreen');
     this.showPane(Auth.isDeviceAuthorized() ? 'loginPane' : 'linkPane');
     document.getElementById('lgPass').addEventListener('keyup', e => { if(e.key==='Enter') App.login(); });
@@ -766,7 +766,7 @@ const App = {
     const u = this.cu, biz = this.cfg?.business || {};
     document.getElementById('tbUser').textContent = u.name;
     document.getElementById('userPill').innerHTML = `<strong>${u.name}</strong><span>${u.role}</span>`;
-    document.getElementById('sbBiz').textContent = biz.name || '';
+    document.getElementById('sSBiz').textContent = biz.name || '';
     this.buildNav();
     if (u.role === 'owner') {
       document.getElementById('nBell').classList.remove('hidden');
@@ -1466,7 +1466,7 @@ async settings(){
         </div>
         <div class="card">
           <div class="card-ttl">App Info</div>
-          <div class="fb" style="padding:5px 0;border-bottom:1px solid var(--border)"><span class="muted">Version</span><span>Biashara Books v4.0</span></div>
+          <div class="fb" style="padding:5px 0;border-bottom:1px solid var(--border)"><span class="muted">Version</span><span>Smart Books v4.0</span></div>
           <div class="fb" style="padding:5px 0;border-bottom:1px solid var(--border)"><span class="muted">Database</span><span>Supabase (PostgreSQL)</span></div>
           <div class="fb" style="padding:5px 0;border-bottom:1px solid var(--border)"><span class="muted">AI</span><span>Groq — Llama 3 (free)</span></div>
           <div class="fb" style="padding:5px 0;border-bottom:1px solid var(--border)"><span class="muted">This Device</span><span class="mono">${Auth.deviceToken()}</span></div>
@@ -1482,7 +1482,7 @@ async saveBiz(){
   const biz={name,address:document.getElementById('sba').value.trim(),phone:document.getElementById('sbp').value.trim(),currency:document.getElementById('sbc').value.trim()||'KSh',kra:document.getElementById('sbk').value.trim()};
   await SB.setConfig('business',JSON.stringify(biz));
   App.cfg.business=biz;localStorage.setItem('lkc_cfg',JSON.stringify(App.cfg));
-  document.getElementById('sbBiz').textContent=biz.name;T.ok('Business info saved!');
+  document.getElementById('sSBiz').textContent=biz.name;T.ok('Business info saved!');
 },
 
 async changePass(){
@@ -1565,7 +1565,7 @@ const PWA = {
   async install() {
     if (!this._prompt) {
       // Show manual instructions if prompt not available (iOS / already installed)
-      M.open('📲 Install Biashara Books', `
+      M.open('📲 Install Smart Books', `
         <div class="alert a-info" style="margin-bottom:14px">Install this app on your device for quick access — works offline for viewing.</div>
         <div style="margin-bottom:16px">
           <div class="bold mb" style="color:var(--green)">📱 Android (Chrome)</div>
