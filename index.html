@@ -19,7 +19,7 @@
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Crect width='192' height='192' rx='40' fill='%231b4332'/%3E%3Ctext x='96' y='130' font-size='110' text-anchor='middle' fill='white' font-family='Georgia'%3E₦%3C/text%3E%3C/svg%3E"/>
 
 <!-- PWA Manifest (inline) -->
-<link rel="manifest" href="data:application/manifest+json,%7B%22name%22%3A%22LKC%20Accounting%22%2C%22short_name%22%3A%22LKC%22%2C%22description%22%3A%22Business%20accounting%20and%20sales%20management%22%2C%22start_url%22%3A%22.%2F%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%231b4332%22%2C%22theme_color%22%3A%22%231b4332%22%2C%22orientation%22%3A%22portrait-primary%22%2C%22icons%22%3A%5B%7B%22src%22%3A%22data%3Aimage%2Fsvg%2Bxml%2C%253Csvg%2520xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%2520viewBox%3D'0%25200%2520192%2520192'%253E%253Crect%2520width%3D'192'%2520height%3D'192'%2520rx%3D'40'%2520fill%3D'%25231b4332'%2F%253E%253Ctext%2520x%3D'96'%2520y%3D'130'%2520font-size%3D'110'%2520text-anchor%3D'middle'%2520fill%3D'white'%253E%25E2%2582%25A6%253C%2Ftext%253E%253C%2Fsvg%253E%22%2C%22sizes%22%3A%22192x192%22%2C%22type%22%3A%22image%2Fsvg%2Bxml%22%7D%5D%7D"/>
+<link rel="manifest" href="data:application/manifest+json,%7B%22name%22%3A%22Smart%20Books%22%2C%22short_name%22%3A%22SB%22%2C%22description%22%3A%22Business%20accounting%20and%20sales%20management%22%2C%22start_url%22%3A%22.%2F%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%231b4332%22%2C%22theme_color%22%3A%22%231b4332%22%2C%22orientation%22%3A%22portrait-primary%22%2C%22icons%22%3A%5B%7B%22src%22%3A%22data%3Aimage%2Fsvg%2Bxml%2C%253Csvg%2520xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%2520viewBox%3D'0%25200%2520192%2520192'%253E%253Crect%2520width%3D'192'%2520height%3D'192'%2520rx%3D'40'%2520fill%3D'%25231b4332'%2F%253E%253Ctext%2520x%3D'96'%2520y%3D'130'%2520font-size%3D'110'%2520text-anchor%3D'middle'%2520fill%3D'white'%253E%25E2%2582%25A6%253C%2Ftext%253E%253C%2Fsvg%253E%22%2C%22sizes%22%3A%22192x192%22%2C%22type%22%3A%22image%2Fsvg%2Bxml%22%7D%5D%7D"/>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
@@ -92,7 +92,7 @@ small{color:var(--text3);font-size:11px;display:block;margin-top:3px}small a{col
 /* ALERTS */
 .alert{padding:10px 13px;border-radius:var(--r);font-size:13px;margin-bottom:14px}
 .a-err{background:var(--red-pale);color:var(--red);border:1px solid #fecaca}
-.a-ok{background:#f0fdf4;color:#15803d;border:1px solid #SBf7d0}
+.a-ok{background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0}
 .a-info{background:var(--blue-pale);color:var(--blue);border:1px solid #bfdbfe}
 .a-warn{background:var(--gold-pale);color:var(--gold);border:1px solid #fed7aa}
 
@@ -214,6 +214,17 @@ tr:last-child td{border-bottom:none}tbody tr:hover{background:var(--bg)}
 @keyframes fadeIn{from{opacity:0}to{opacity:1}}
 @keyframes slideUp{from{opacity:0;transform:translateY(13px)}to{opacity:1;transform:translateY(0)}}
 
+/* OFFLINE BANNER */
+.offline-banner{position:fixed;top:var(--th);left:var(--sw);right:0;z-index:200;background:var(--gold);color:#fff;
+  padding:8px 18px;font-size:13px;font-weight:500;display:flex;align-items:center;justify-content:space-between;
+  animation:slideDown .3s ease;box-shadow:0 2px 8px rgba(0,0,0,.15)}
+.offline-banner.syncing{background:var(--blue)}
+.offline-banner.synced{background:#15803d}
+@keyframes slideDown{from{opacity:0;transform:translateY(-100%)}to{opacity:1;transform:translateY(0)}}
+.offline-banner .ob-right{display:flex;align-items:center;gap:10px}
+.pending-dot{background:rgba(255,255,255,.3);border-radius:99px;padding:2px 10px;font-size:12px;font-weight:700}
+@media(max-width:768px){.offline-banner{left:0}}
+
 @media(max-width:768px){
   .sidebar{transform:translateX(-100%)}.sidebar.open{transform:translateX(0)}
   .topbar{left:0}.main-content{margin-left:0;padding:13px}.menu-tog{display:block}
@@ -243,7 +254,7 @@ tr:last-child td{border-bottom:none}tbody tr:hover{background:var(--bg)}
     </div>
     <ol class="steps-ol">
       <li>Go to <a href="https://supabase.com" target="_blank">supabase.com</a> → <strong>Start your project</strong> → sign up free with email.</li>
-      <li>Click <strong>New project</strong> → name it <code>lkc-accounting</code> → set a database password → choose a region → <strong>Create project</strong>. Wait ~1 minute.</li>
+      <li>Click <strong>New project</strong> → name it <code>smart-books</code> → set a database password → choose a region → <strong>Create project</strong>. Wait ~1 minute.</li>
       <li>In the left sidebar click <strong>SQL Editor</strong> → click <strong>New query</strong> → paste the SQL below → click <strong>Run</strong>.</li>
       <li>Go to <strong>Project Settings → API</strong> → copy your <strong>Project URL</strong> and <strong>anon public key</strong>.</li>
       <li>Paste both below and click Connect.</li>
@@ -364,7 +375,7 @@ create table if not exists devices(id text primary key, token text, authorized_a
 <div id="appShell" class="app-shell hidden">
   <aside class="sidebar" id="sidebar">
     <div class="sb-brand"><div class="sb-ico">₦</div><span>SB</span></div>
-    <div class="sb-biz" id="sSBiz"></div>
+    <div class="sb-biz" id="sbBiz"></div>
     <nav class="sb-nav" id="sbNav"></nav>
     <div class="sb-foot">
       <div class="user-pill" id="userPill"></div>
@@ -380,6 +391,14 @@ create table if not exists devices(id text primary key, token text, authorized_a
       <button id="installBtn" class="btn btn-sm btn-g hidden" onclick="PWA.install()" title="Install as app" style="padding:4px 10px;font-size:12px">⬇ Install App</button>
       <div id="nBell" class="notif-bell hidden" onclick="P.notifications()">🔔<span class="notif-bdg" id="nBdg">0</span></div>
       <span class="tb-user" id="tbUser"></span>
+    </div>
+  </div>
+
+  <div id="offlineBanner" class="offline-banner hidden">
+    <span id="offlineMsg">📡 You are offline — sales are saved locally and will sync when you reconnect</span>
+    <div class="ob-right">
+      <span class="pending-dot" id="pendingCount" style="display:none"></span>
+      <button class="btn btn-sm" style="background:rgba(255,255,255,.2);color:#fff;border:none;cursor:pointer" onclick="Offline.syncNow()">Sync Now</button>
     </div>
   </div>
 
@@ -473,7 +492,7 @@ const SB = {
 //  CONFIG — Supabase credentials stored in localStorage
 // ══════════════════════════════════════════════════════
 const CFG = {
-  KEY: 'lkc_sbcfg',
+  KEY: 'sb_cfg',
   get() { try { return JSON.parse(localStorage.getItem(this.KEY)); } catch { return null; } },
   set(url, key) { localStorage.setItem(this.KEY, JSON.stringify({ url, key })); },
   clear() { localStorage.removeItem(this.KEY); }
@@ -518,12 +537,12 @@ const Auth = {
     return h.toString(36);
   },
   deviceToken() {
-    let t = localStorage.getItem('lkc_dt');
-    if (!t) { t = 'D-' + Date.now().toString(36).toUpperCase() + '-' + Math.random().toString(36).slice(2, 6).toUpperCase(); localStorage.setItem('lkc_dt', t); }
+    let t = localStorage.getItem('sb_dt');
+    if (!t) { t = 'D-' + Date.now().toString(36).toUpperCase() + '-' + Math.random().toString(36).slice(2, 6).toUpperCase(); localStorage.setItem('sb_dt', t); }
     return t;
   },
-  isDeviceAuthorized() { return !!localStorage.getItem('lkc_da'); },
-  markAuthorized() { localStorage.setItem('lkc_da', '1'); }
+  isDeviceAuthorized() { return !!localStorage.getItem('sb_da'); },
+  markAuthorized() { localStorage.setItem('sb_da', '1'); }
 };
 
 // ══════════════════════════════════════════════════════
@@ -568,7 +587,7 @@ const Setup = {
       Auth.markAuthorized();
       // Cache
       const cfg = { setup_done: 'true', business: Setup._biz, groq_key: Setup._groq, admin_hash: Auth.hash(Setup._ap) };
-      localStorage.setItem('lkc_cfg', JSON.stringify(cfg));
+      localStorage.setItem('sb_appcfg', JSON.stringify(cfg));
       App.cfg = cfg;
       document.getElementById('sv3').classList.add('hidden');
       document.getElementById('setupOk').textContent = '✓ Setup complete! Taking you to login...';
@@ -641,7 +660,7 @@ const App = {
     SB.init(sbCfg.url, sbCfg.key);
 
     // Try cache first
-    const cached = localStorage.getItem('lkc_cfg');
+    const cached = localStorage.getItem('sb_appcfg');
     if (cached) {
       try {
         const c = JSON.parse(cached);
@@ -676,7 +695,7 @@ const App = {
     rows.forEach(r => { map[r.key] = r.value; });
     const biz = map.business ? JSON.parse(map.business) : {};
     this.cfg = { setup_done: map.setup_done, admin_hash: map.admin_hash, business: biz, groq_key: map.groq_key || '' };
-    localStorage.setItem('lkc_cfg', JSON.stringify(this.cfg));
+    localStorage.setItem('sb_appcfg', JSON.stringify(this.cfg));
   },
 
   _showLogin(cfg) {
@@ -704,7 +723,7 @@ const App = {
       const user = users.find(u => u.name.toLowerCase() === name.toLowerCase() && u.password === Auth.hash(pass));
       if (!user) { err.textContent = 'Name or password is incorrect.'; err.classList.remove('hidden'); document.getElementById('lgPass').value = ''; setSyncState('ok'); return; }
       this.cu = user;
-      sessionStorage.setItem('lkc_uid', user.id);
+      sessionStorage.setItem('sb_uid', user.id);
       setSyncState('ok');
       this.startApp();
     } catch(e) { err.textContent = 'Connection error: ' + e.message; err.classList.remove('hidden'); setSyncState('err'); }
@@ -766,7 +785,7 @@ const App = {
     const u = this.cu, biz = this.cfg?.business || {};
     document.getElementById('tbUser').textContent = u.name;
     document.getElementById('userPill').innerHTML = `<strong>${u.name}</strong><span>${u.role}</span>`;
-    document.getElementById('sSBiz').textContent = biz.name || '';
+    document.getElementById('sbBiz').textContent = biz.name || '';
     this.buildNav();
     if (u.role === 'owner') {
       document.getElementById('nBell').classList.remove('hidden');
@@ -779,7 +798,7 @@ const App = {
 
   logout() {
     Poller.stop(); this.cu = null;
-    sessionStorage.removeItem('lkc_uid');
+    sessionStorage.removeItem('sb_uid');
     show('loginScreen'); this.showPane('loginPane');
     document.getElementById('lgName').value = ''; document.getElementById('lgPass').value = '';
   },
@@ -804,6 +823,7 @@ const App = {
   },
 
   nav(pg) {
+    this.currentPage = pg;
     document.querySelectorAll('.ni').forEach(e=>e.classList.remove('active'));
     const b=document.getElementById('nav_'+pg); if(b) b.classList.add('active');
     document.getElementById('tbTitle').textContent={dashboard:'Dashboard',sales:'Sales',stock:'Stock',reports:'Reports',team:'Team',ai:'AI Accountant',settings:'Settings'}[pg]||pg;
@@ -874,6 +894,7 @@ async sales() {
         ${canEdit?`<button class="btn btn-g btn-sm" onclick="P.newRestock()">+ Restock</button>`:''}
       </div></div>
     ${u.role==='sales'?'<div class="alert a-info mb sm">You can only see your own sales. Contact the owner to edit or delete.</div>':''}
+    <div id="offlineQueueAlert" class="hidden"></div>
     <div class="filter-bar">
       <input class="si" placeholder="Search product or name..." oninput="P.setSF('txt',this.value)"/>
       <select style="max-width:150px" onchange="P.setSF('pm',this.value)"><option value="">All Payments</option><option>Cash</option><option>Mpesa</option><option>Card</option><option>Cheque</option><option>Bank</option><option>Credit</option><option>Other</option></select>
@@ -885,6 +906,16 @@ async sales() {
     let filter='';
     if(u.role==='sales') filter=`sold_by_id=eq.${u.id}`;
     P._sales=await SB.select('sales', filter, 'created_at.desc');
+    // Show offline pending queue at top
+    const qAlert=document.getElementById('offlineQueueAlert');
+    const queue=Offline.getQueue();
+    const myQueue=u.role==='sales'?queue.filter(q=>q.sale.sold_by_id===u.id):queue;
+    if(myQueue.length>0&&qAlert){
+      qAlert.className='alert a-warn mb';
+      qAlert.innerHTML=`📡 <strong>${myQueue.length} sale${myQueue.length>1?'s':''} waiting to sync</strong> (recorded offline):<br><span class="sm">${myQueue.map(q=>`${q.sale.quantity}× ${q.sale.product_name} — ${App.fmt(q.sale.total)}`).join(', ')}</span>
+      ${navigator.onLine?`<button class="btn btn-sm btn-p" style="margin-left:10px" onclick="Offline.syncNow()">Sync Now</button>`:''}`;
+      qAlert.classList.remove('hidden');
+    } else if(qAlert) qAlert.classList.add('hidden');
     P.renderSalesTbl();
   }catch(e){document.getElementById('salesTbl').innerHTML=`<div class="empty"><p>Error: ${e.message}</p></div>`;}
 },
@@ -947,15 +978,44 @@ async saveSale(){
   if(!pid)return T.err('Select a product.');if(!qty||qty<1)return T.err('Qty must be at least 1.');if(!up||up<=0)return T.err('Enter a valid price.');
   const prod=(P._prods||[]).find(p=>p.id===pid);if(!prod)return T.err('Product not found.');if(Number(prod.quantity)<qty)return T.err(`Only ${prod.quantity} in stock.`);
   const btn=document.querySelector('#mFt .btn-p');if(btn){btn.disabled=true;btn.textContent='Saving...';}
+
+  const sid=SB.genId('S');
+  const saleData={id:sid,product_id:pid,product_name:prod.name,quantity:qty,unit_price:up,total:qty*up,
+    payment_method:pm,customer:document.getElementById('scust').value.trim()||'Walk-in',
+    notes:document.getElementById('snotes').value.trim(),sold_by:App.cu.name,sold_by_id:App.cu.id,
+    created_at:new Date().toISOString()};
+
+  // ── OFFLINE: save to queue and update local product cache ──
+  if(!Offline.isOnline()){
+    Offline.addToQueue(saleData, {id:pid, deducted:qty});
+    // Update local product list so stock shows correctly offline
+    if(P._prods){const i=P._prods.findIndex(p=>p.id===pid);if(i>=0){P._prods[i]={...P._prods[i],quantity:Number(P._prods[i].quantity)-qty,total_sold:(Number(P._prods[i].total_sold||0)+qty)};}}
+    if(P._stProds){const i=P._stProds.findIndex(p=>p.id===pid);if(i>=0){P._stProds[i]={...P._stProds[i],quantity:Number(P._stProds[i].quantity)-qty};}}
+    M.close();
+    T.warn(`📡 Offline — sale saved locally. Will sync when you reconnect.`);
+    P.sales();
+    if(btn){btn.disabled=false;btn.textContent='Record Sale ✓';}
+    return;
+  }
+
+  // ── ONLINE: save to Supabase normally ──
   try{
-    const sid=SB.genId('S');
-    await SB.insert('sales',{id:sid,product_id:pid,product_name:prod.name,quantity:qty,unit_price:up,total:qty*up,payment_method:pm,customer:document.getElementById('scust').value.trim()||'Walk-in',notes:document.getElementById('snotes').value.trim(),sold_by:App.cu.name,sold_by_id:App.cu.id});
+    await SB.insert('sales',saleData);
     await SB.update('products',`id=eq.${pid}`,{quantity:Number(prod.quantity)-qty,total_sold:Number(prod.total_sold||0)+qty});
     await SB.insert('notifications',{id:SB.genId('N'),message:`🛒 ${App.cu.name} sold ${qty}× ${prod.name} for ${App.fmt(qty*up)} via ${pm}`,type:'sale',read_by:''});
     const newQty=Number(prod.quantity)-qty;
     if(newQty<=Number(prod.low_alert||5)) await SB.insert('notifications',{id:SB.genId('N'),message:`⚠ Low stock: ${prod.name} now has only ${newQty} units.`,type:'alert',read_by:''});
     M.close();T.ok(`Sale recorded — ${App.fmt(qty*up)}`);P.sales();
-  }catch(e){T.err('Error: '+e.message);if(btn){btn.disabled=false;btn.textContent='Record Sale ✓';}}
+  }catch(e){
+    // If Supabase fails despite being "online", queue it
+    if(e.message.includes('fetch')||e.message.includes('network')||e.message.includes('Failed')){
+      Offline.addToQueue(saleData,{id:pid,deducted:qty});
+      M.close();T.warn('Connection issue — sale saved locally and will sync automatically.');P.sales();
+    } else {
+      T.err('Error: '+e.message);
+    }
+    if(btn){btn.disabled=false;btn.textContent='Record Sale ✓';}
+  }
 },
 
 async delSale(id){
@@ -1429,7 +1489,7 @@ async aiSaveKey(){
   const k=document.getElementById('groqIn').value.trim();if(!k)return T.err('Enter your API key.');
   await SB.setConfig('groq_key',k);App.cfg.groq_key=k;
   // Update cache
-  localStorage.setItem('lkc_cfg',JSON.stringify(App.cfg));
+  localStorage.setItem('sb_appcfg',JSON.stringify(App.cfg));
   M.close();T.ok('Groq API key saved!');P.ai();
 },
 
@@ -1481,8 +1541,8 @@ async saveBiz(){
   const name=document.getElementById('sbn').value.trim();if(!name)return T.err('Name required.');
   const biz={name,address:document.getElementById('sba').value.trim(),phone:document.getElementById('sbp').value.trim(),currency:document.getElementById('sbc').value.trim()||'KSh',kra:document.getElementById('sbk').value.trim()};
   await SB.setConfig('business',JSON.stringify(biz));
-  App.cfg.business=biz;localStorage.setItem('lkc_cfg',JSON.stringify(App.cfg));
-  document.getElementById('sSBiz').textContent=biz.name;T.ok('Business info saved!');
+  App.cfg.business=biz;localStorage.setItem('sb_appcfg',JSON.stringify(App.cfg));
+  document.getElementById('sbBiz').textContent=biz.name;T.ok('Business info saved!');
 },
 
 async changePass(){
@@ -1500,7 +1560,7 @@ async changeAdminPass(){
   if(Auth.hash(old)!==adminHash)return T.err('Current admin password incorrect.');
   if(np.length<4)return T.err('Min 4 characters.');if(np!==npc)return T.err("Passwords don't match.");
   await SB.setConfig('admin_hash',Auth.hash(np));
-  App.cfg.admin_hash=Auth.hash(np);localStorage.setItem('lkc_cfg',JSON.stringify(App.cfg));
+  App.cfg.admin_hash=Auth.hash(np);localStorage.setItem('sb_appcfg',JSON.stringify(App.cfg));
   T.ok('Admin password changed!');
   document.getElementById('cadminOld').value='';document.getElementById('cadminNew').value='';document.getElementById('cadminNewC').value='';
 },
@@ -1541,6 +1601,168 @@ function splash(msg){document.getElementById('splashMsg').textContent=msg||'Load
 function hideSplash(){document.getElementById('splash').classList.add('hidden');}
 function show(id){['splash','connScreen','setupScreen','loginScreen','appShell'].forEach(s=>document.getElementById(s).classList.add('hidden'));document.getElementById(id).classList.remove('hidden');}
 function setSyncState(state){const d=document.getElementById('sdot'),t=document.getElementById('stxt');if(!d)return;if(state==='busy'){d.className='sdot busy';if(t)t.textContent='Syncing...';}else if(state==='err'){d.className='sdot err';if(t)t.textContent='Error';}else{d.className='sdot';if(t)t.textContent='Ready';}}
+
+// ══════════════════════════════════════════════════════
+//  OFFLINE SYNC SYSTEM
+// ══════════════════════════════════════════════════════
+const Offline = {
+  QUEUE_KEY: 'sb_offline_queue',
+  _online: navigator.onLine,
+  _syncing: false,
+
+  init() {
+    window.addEventListener('online',  () => this.onOnline());
+    window.addEventListener('offline', () => this.onOffline());
+    if (!navigator.onLine) this.onOffline();
+    // Try sync on load in case there are pending items
+    if (navigator.onLine) setTimeout(() => this.syncNow(), 3000);
+  },
+
+  onOffline() {
+    this._online = false;
+    setSyncState('err');
+    const b = document.getElementById('offlineBanner');
+    if (b) {
+      b.className = 'offline-banner';
+      b.classList.remove('hidden');
+      document.getElementById('offlineMsg').textContent = '📡 You are offline — sales are saved locally and will sync when you reconnect';
+    }
+    this.updatePendingCount();
+  },
+
+  onOnline() {
+    this._online = true;
+    setSyncState('ok');
+    const pending = this.getQueue();
+    if (pending.length > 0) {
+      const b = document.getElementById('offlineBanner');
+      if (b) {
+        b.className = 'offline-banner syncing';
+        b.classList.remove('hidden');
+        document.getElementById('offlineMsg').textContent = `🔄 Back online — syncing ${pending.length} pending sale${pending.length>1?'s':''}...`;
+      }
+      this.syncNow();
+    } else {
+      // No pending — hide banner
+      const b = document.getElementById('offlineBanner');
+      if (b) b.classList.add('hidden');
+    }
+  },
+
+  getQueue() {
+    try { return JSON.parse(localStorage.getItem(this.QUEUE_KEY) || '[]'); } catch { return []; }
+  },
+
+  addToQueue(sale, stockUpdate) {
+    const queue = this.getQueue();
+    queue.push({ sale, stockUpdate, queuedAt: new Date().toISOString(), id: 'Q' + Date.now() });
+    localStorage.setItem(this.QUEUE_KEY, JSON.stringify(queue));
+    this.updatePendingCount();
+  },
+
+  removeFromQueue(queueId) {
+    const queue = this.getQueue().filter(q => q.id !== queueId);
+    localStorage.setItem(this.QUEUE_KEY, JSON.stringify(queue));
+    this.updatePendingCount();
+  },
+
+  clearQueue() {
+    localStorage.removeItem(this.QUEUE_KEY);
+    this.updatePendingCount();
+  },
+
+  updatePendingCount() {
+    const count = this.getQueue().length;
+    const el = document.getElementById('pendingCount');
+    if (el) {
+      if (count > 0) {
+        el.textContent = count + ' pending';
+        el.style.display = 'inline';
+      } else {
+        el.style.display = 'none';
+      }
+    }
+  },
+
+  async syncNow() {
+    if (this._syncing || !navigator.onLine) return;
+    const queue = this.getQueue();
+    if (!queue.length) {
+      const b = document.getElementById('offlineBanner');
+      if (b) b.classList.add('hidden');
+      return;
+    }
+
+    this._syncing = true;
+    setSyncState('busy');
+    const banner = document.getElementById('offlineBanner');
+    if (banner) {
+      banner.className = 'offline-banner syncing';
+      document.getElementById('offlineMsg').textContent = `🔄 Syncing ${queue.length} pending sale${queue.length>1?'s':''}...`;
+    }
+
+    let synced = 0, failed = 0;
+
+    for (const item of queue) {
+      try {
+        // Check if sale already synced (avoid duplicates)
+        const existing = await SB.select('sales', `id=eq.${item.sale.id}`);
+        if (!existing.length) {
+          await SB.insert('sales', item.sale);
+        }
+        // Update stock
+        if (item.stockUpdate) {
+          const prod = await SB.select('products', `id=eq.${item.stockUpdate.id}`);
+          if (prod.length) {
+            // Apply delta from when it was queued
+            const newQty = Math.max(0, Number(prod[0].quantity) - item.stockUpdate.deducted);
+            const newSold = Number(prod[0].total_sold || 0) + item.stockUpdate.deducted;
+            await SB.update('products', `id=eq.${item.stockUpdate.id}`, { quantity: newQty, total_sold: newSold });
+          }
+        }
+        // Send notification
+        try {
+          await SB.insert('notifications', {
+            id: SB.genId('N'),
+            message: `🛒 [OFFLINE] ${item.sale.sold_by} sold ${item.sale.quantity}× ${item.sale.product_name} for ${App.fmt(item.sale.total)} via ${item.sale.payment_method}`,
+            type: 'sale', read_by: ''
+          });
+        } catch(e) {} // notification failure is non-critical
+
+        this.removeFromQueue(item.id);
+        synced++;
+      } catch(e) {
+        failed++;
+        console.warn('Failed to sync item:', item.id, e.message);
+      }
+    }
+
+    this._syncing = false;
+
+    if (failed === 0) {
+      setSyncState('ok');
+      if (banner) {
+        banner.className = 'offline-banner synced';
+        document.getElementById('offlineMsg').textContent = `✓ All ${synced} sale${synced>1?'s':''} synced successfully!`;
+        setTimeout(() => banner.classList.add('hidden'), 3000);
+      }
+      T.ok(`✓ ${synced} offline sale${synced>1?'s':''} synced!`);
+      // Refresh current page if on sales or dashboard
+      if (App.currentPage === 'sales') P.sales();
+      if (App.currentPage === 'dashboard') P.dashboard();
+    } else {
+      if (banner) {
+        banner.className = 'offline-banner';
+        document.getElementById('offlineMsg').textContent = `⚠ ${synced} synced, ${failed} failed — will retry automatically`;
+      }
+      T.warn(`${failed} sale(s) failed to sync — will retry when connection stabilises`);
+    }
+
+    this.updatePendingCount();
+  },
+
+  isOnline() { return navigator.onLine; }
+};
 
 // ══════════════════════════════════════════════════════
 //  PWA INSTALL
@@ -1615,7 +1837,7 @@ self.addEventListener('fetch', e => {
   navigator.serviceWorker.register(URL.createObjectURL(blob)).catch(()=>{});
 }
 
-window.addEventListener('DOMContentLoaded',()=>{App.boot();PWA.init();});
+window.addEventListener('DOMContentLoaded',()=>{App.boot();PWA.init();Offline.init();});
 
 // ══════════════════════════════════════════════════════
 //  PWA — Install prompt
@@ -1704,7 +1926,7 @@ if ('serviceWorker' in navigator) {
   const blob = new Blob([swCode], { type: 'application/javascript' });
   const swUrl = URL.createObjectURL(blob);
   navigator.serviceWorker.register(swUrl, { scope: './' })
-    .then(() => console.log('LKC SW registered'))
+    .then(() => console.log('Smart Books SW registered'))
     .catch(e => console.log('SW error:', e));
 }
 </script>
