@@ -242,9 +242,22 @@ tr:last-child td{border-bottom:none}tbody tr:hover{background:var(--bg)}
   .sc::before{print-color-adjust:exact;-webkit-print-color-adjust:exact}
   table{font-size:11px}
   th,td{padding:6px 10px!important}
-  @page{margin:1.5cm;size:A4}
+  @page{
+    size:A4;
+    margin:1.5cm;
+    /* Suppress browser-printed URL, date and page numbers */
+    margin-top:1.5cm;
+    margin-bottom:1.5cm;
+  }
+  /* Hide browser header/footer URL line */
+  html{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .no-print{display:none!important}
 }
+/* Override @page margins at root so browser doesn't add its own headers */
+@page{margin:1.2cm 1.5cm;size:A4;@top-center{content:none}@bottom-center{content:none}@top-left{content:none}@top-right{content:none}@bottom-left{content:none}@bottom-right{content:none}}
+
 .rpt-print-header{display:none}
+.no-print{display:none}
 </style>
 </head>
 <body>
