@@ -214,6 +214,35 @@ tr:last-child td{border-bottom:none}tbody tr:hover{background:var(--bg)}
 @keyframes fadeIn{from{opacity:0}to{opacity:1}}
 @keyframes slideUp{from{opacity:0;transform:translateY(13px)}to{opacity:1;transform:translateY(0)}}
 
+/* PAYMENT METHOD GRID */
+.pay-method-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:4px}
+.pm-opt{border:2px solid var(--border);border-radius:10px;padding:10px 6px;cursor:pointer;text-align:center;transition:all .18s;background:var(--card)}
+.pm-opt:hover,.pm-opt.selected{border-color:var(--green);background:var(--green-pale)}
+.pm-icon{font-size:20px;margin-bottom:4px}
+.pm-name{font-size:11px;font-weight:600;color:var(--text2)}
+.pm-opt.selected .pm-name{color:var(--green)}
+/* MPESA PANEL */
+.mpesa-panel{background:var(--green-pale);border:1.5px solid var(--green);border-radius:10px;padding:14px;margin-bottom:10px}
+.mpesa-panel h4{font-size:13px;font-weight:700;color:var(--green);margin-bottom:10px}
+.mpesa-type-tabs{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap}
+.mt-tab{padding:5px 11px;border-radius:99px;font-size:12px;font-weight:600;cursor:pointer;border:1.5px solid var(--green);color:var(--green);background:transparent;transition:all .18s;white-space:nowrap}
+.mt-tab.active{background:var(--green);color:#fff}
+.stk-status{margin-top:8px;padding:9px 12px;border-radius:8px;font-size:13px;line-height:1.5}
+.stk-status.pending{background:#fef3c7;color:#92400e;border:1px solid #fcd34d}
+.stk-status.failed{background:var(--red-pale);color:var(--red);border:1px solid #fecaca}
+/* RECEIPT MODAL */
+.receipt-panel{background:var(--green);color:#fff;border-radius:12px;padding:18px;text-align:center;margin-bottom:16px}
+.receipt-prod{font-size:15px;font-weight:600;margin-bottom:4px}
+.receipt-amt{font-family:var(--fd);font-size:28px;font-weight:700;margin-bottom:4px}
+.receipt-id{font-size:11px;opacity:.6;margin-top:6px;font-family:monospace;letter-spacing:.05em}
+.receipt-actions{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-bottom:4px}
+.receipt-btn{border:1.5px solid var(--border);border-radius:10px;padding:12px 6px;cursor:pointer;text-align:center;transition:all .18s;display:flex;flex-direction:column;gap:3px;align-items:center}
+.receipt-btn:hover{border-color:var(--green);background:var(--green-pale)}
+.receipt-btn.wa{border-color:#25d366;background:#f0fdf4}.receipt-btn.wa:hover{background:#dcfce7}
+.rb-icon{font-size:20px}
+.receipt-btn>span:nth-child(2){font-size:12px;font-weight:600;color:var(--text)}
+@media(max-width:480px){.pay-method-grid{grid-template-columns:repeat(4,1fr)}.receipt-actions{grid-template-columns:1fr 1fr}}
+
 /* OFFLINE BANNER */
 .offline-banner{position:fixed;top:var(--th);left:var(--sw);right:0;z-index:200;background:var(--gold);color:#fff;
   padding:8px 18px;font-size:13px;font-weight:500;display:flex;align-items:center;justify-content:space-between;
@@ -976,7 +1005,7 @@ async newSale(){
   try{prods=await SB.select('products','active=eq.true&quantity=gt.0');}
   catch(e){return T.err('Could not load products.');}
   if(!prods.length) return T.warn('No products in stock. Add products first.');
-  P._prods=prods;
+  P._prods=prods; P._selPM='Cash';
   M.open('Record New Sale',`
     <div class="fg"><label>Product</label>
       <select id="sp" onchange="P._spChg()"><option value="">— Select product —</option>
@@ -988,60 +1017,305 @@ async newSale(){
       <div class="fg"><label>Unit Price</label><input type="number" id="sup" min="0" step="0.01" oninput="P._calcT()"/></div>
     </div>
     <div class="fg"><label>Payment Method</label>
-      <select id="spm"><option>Cash</option><option>Mpesa</option><option>Card</option><option>Cheque</option><option>Bank</option><option>Credit</option><option>Other</option></select></div>
-    <div class="fg"><label>Customer <span class="lh">(optional)</span></label><input type="text" id="scust" placeholder="Walk-in customer"/></div>
+      <div class="pay-method-grid">
+        ${[['Cash','💵'],['Mpesa','📱'],['Card','💳'],['Cheque','📝'],['Bank','🏦'],['Credit','⏳'],['Pochi','👛'],['Other','💱']].map(([m,ic])=>
+          `<div class="pm-opt ${m==='Cash'?'selected':''}" onclick="P._selPMFn('${m}',this)"><div class="pm-icon">${ic}</div><div class="pm-name">${m}</div></div>`).join('')}
+      </div>
+    </div>
+    <div id="mpesaPanel" class="mpesa-panel hidden">
+      <h4>Mpesa Payment Details</h4>
+      <div class="mpesa-type-tabs">
+        <div class="mt-tab active" onclick="P._mpesaType('till',this)">Till Number</div>
+        <div class="mt-tab" onclick="P._mpesaType('paybill',this)">Paybill</div>
+        <div class="mt-tab" onclick="P._mpesaType('pochi',this)">Pochi la Biashara</div>
+        <div class="mt-tab" onclick="P._mpesaType('sendmoney',this)">Send Money</div>
+      </div>
+      <div id="mpesaInstructions" style="font-size:13px;color:var(--text2);line-height:1.8;background:#fff;padding:10px;border-radius:8px"></div>
+      <div id="stkSection" class="hidden" style="margin-top:10px">
+        <div class="fg"><label>Customer Phone (for STK Push)</label>
+          <input type="tel" id="stkPhone" placeholder="e.g. 0712 345 678"/>
+        </div>
+        <button class="btn btn-p btn-full" onclick="P.sendSTK()" id="stkBtn">📲 Send Payment Request to Customer's Phone</button>
+        <div id="stkStatus" class="hidden"></div>
+      </div>
+    </div>
+    <div class="fg"><label>Customer Name <span class="lh">(optional)</span></label><input type="text" id="scust" placeholder="Walk-in customer"/></div>
     <div class="fg"><label>Notes <span class="lh">(optional)</span></label><input type="text" id="snotes"/></div>
     <div class="card" style="background:var(--green-pale);border-color:var(--green)">
       <div class="fb"><span class="bold">Total:</span><span id="stotal" style="font-family:var(--fd);font-size:18px;color:var(--green)">${App.cfg?.business?.currency||'KSh'} 0.00</span></div>
     </div>`,
     [{lbl:'Cancel',cls:'btn-o',fn:'M.close()'},{lbl:'Record Sale ✓',cls:'btn-p',fn:'P.saveSale()'}]);
 },
+
+_selPM:'Cash',
+_selPMFn(method,el){
+  document.querySelectorAll('.pm-opt').forEach(e=>e.classList.remove('selected'));
+  el.classList.add('selected'); P._selPM=method;
+  const panel=document.getElementById('mpesaPanel');
+  if(method==='Mpesa'||method==='Pochi'){
+    panel.classList.remove('hidden');
+    P._mpesaType(method==='Pochi'?'pochi':'till',document.querySelector('.mt-tab'));
+  } else { panel.classList.add('hidden'); }
+},
+
+_mpesaType(type,el){
+  if(el){document.querySelectorAll('.mt-tab').forEach(e=>e.classList.remove('active'));el.classList.add('active');}
+  const biz=App.cfg?.business||{};
+  const instr=document.getElementById('mpesaInstructions');
+  const stkSec=document.getElementById('stkSection');
+  const qty=parseInt(document.getElementById('sq')?.value)||1;
+  const up=parseFloat(document.getElementById('sup')?.value)||0;
+  const amtStr=qty*up>0?App.fmt(qty*up):'[AMOUNT]';
+  if(type==='till'){
+    const till=biz.mpesa_till||'<em>Not set — add in Settings</em>';
+    instr.innerHTML=`<strong>Buy Goods (Till)</strong><br>Mpesa → Buy Goods → Till No. <strong style="color:var(--green)">${till}</strong><br>Amount: <strong>${amtStr}</strong>`;
+    if(biz.mpesa_till&&biz.daraja_key)stkSec.classList.remove('hidden');else stkSec.classList.add('hidden');
+  } else if(type==='paybill'){
+    const pb=biz.mpesa_paybill||'<em>Not set</em>',acc=biz.mpesa_account||biz.name||'Account';
+    instr.innerHTML=`<strong>Paybill</strong><br>Mpesa → Pay Bill → Business No. <strong style="color:var(--green)">${pb}</strong><br>Account No: <strong>${acc}</strong> · Amount: <strong>${amtStr}</strong>`;
+    if(biz.mpesa_paybill&&biz.daraja_key)stkSec.classList.remove('hidden');else stkSec.classList.add('hidden');
+  } else if(type==='pochi'){
+    const pochi=biz.mpesa_pochi||biz.mpesa_phone||'<em>Not set</em>';
+    instr.innerHTML=`<strong>Pochi la Biashara</strong><br>Mpesa → Send Money → <strong style="color:var(--green)">${pochi}</strong><br>Amount: <strong>${amtStr}</strong>`;
+    stkSec.classList.add('hidden');
+  } else {
+    const phone=biz.mpesa_phone||'<em>Not set</em>';
+    instr.innerHTML=`<strong>Send Money</strong><br>Mpesa → Send Money → <strong style="color:var(--green)">${phone}</strong><br>Amount: <strong>${amtStr}</strong><br><small style="color:var(--text3)">Confirm the name before sending.</small>`;
+    stkSec.classList.add('hidden');
+  }
+},
+
+async sendSTK(){
+  const phoneRaw=document.getElementById('stkPhone')?.value.replace(/\s/g,'');
+  const biz=App.cfg?.business||{};
+  if(!phoneRaw||phoneRaw.length<9)return T.err('Enter a valid customer phone number.');
+  const qty=parseInt(document.getElementById('sq')?.value)||1;
+  const up=parseFloat(document.getElementById('sup')?.value)||0;
+  const amount=Math.ceil(qty*up);
+  if(amount<=0)return T.err('Enter product and price first.');
+  if(!biz.daraja_key||!biz.daraja_secret)return T.err('Set up Daraja API keys in Settings → Mpesa Settings first.');
+  const btn=document.getElementById('stkBtn');btn.disabled=true;btn.textContent='⏳ Sending...';
+  const statusEl=document.getElementById('stkStatus');statusEl.className='stk-status pending';statusEl.textContent='🔐 Getting Mpesa token...';statusEl.classList.remove('hidden');
+  try{
+    const fmtPhone=phoneRaw.replace(/^0/,'254').replace(/^\+/,'');
+    const tillOrPaybill=biz.mpesa_till||biz.mpesa_paybill;
+    const isPaybill=!!biz.mpesa_paybill&&!biz.mpesa_till;
+    const base=biz.daraja_base||'https://sandbox.safaricom.co.ke';
+    const creds=btoa(biz.daraja_key+':'+biz.daraja_secret);
+    const tokenResp=await fetch(`${base}/oauth/v1/generate?grant_type=client_credentials`,{headers:{'Authorization':'Basic '+creds}});
+    if(!tokenResp.ok)throw new Error('Could not get Mpesa token. Check your Daraja credentials.');
+    const {access_token:token}=await tokenResp.json();
+    if(!token)throw new Error('Invalid token from Safaricom.');
+    statusEl.textContent='📲 Sending payment request...';
+    const ts=new Date().toISOString().replace(/[-:T.Z]/g,'').slice(0,14);
+    const password=btoa(tillOrPaybill+(biz.daraja_password||'')+ts);
+    const stkResp=await fetch(`${base}/mpesa/stkpush/v1/processrequest`,{method:'POST',
+      headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},
+      body:JSON.stringify({BusinessShortCode:tillOrPaybill,Password:password,Timestamp:ts,
+        TransactionType:isPaybill?'CustomerPayBillOnline':'CustomerBuyGoodsOnline',
+        Amount:amount,PartyA:fmtPhone,PartyB:tillOrPaybill,PhoneNumber:fmtPhone,
+        CallBackURL:'https://smartbooks.co.ke/callback',
+        AccountReference:biz.mpesa_account||biz.name||'SmartBooks',TransactionDesc:'Smart Books Sale'})});
+    const stkData=await stkResp.json();
+    if(stkData.ResponseCode==='0'){
+      statusEl.className='stk-status pending';
+      statusEl.innerHTML='📲 <strong>Request sent!</strong> Customer will see a Mpesa prompt to enter PIN. Once they pay, click <strong>Record Sale ✓</strong>';
+    } else throw new Error(stkData.errorMessage||stkData.ResponseDescription||'STK push failed.');
+  }catch(e){
+    statusEl.className='stk-status failed';
+    statusEl.innerHTML='❌ '+e.message+' <small>You can still collect payment manually.</small>';
+  }
+  btn.disabled=false;btn.textContent='📲 Resend Payment Request';
+},
+
 _spChg(){const s=document.getElementById('sp'),o=s.options[s.selectedIndex];if(!o.value)return;document.getElementById('sup').value=o.dataset.price;document.getElementById('spInfo').textContent=`${o.dataset.stock} units available`;document.getElementById('spInfo').classList.remove('hidden');P._calcT();},
 _calcT(){const q=parseFloat(document.getElementById('sq')?.value)||0,p=parseFloat(document.getElementById('sup')?.value)||0;const el=document.getElementById('stotal');if(el)el.textContent=App.fmt(q*p);},
 
 async saveSale(){
-  const pid=document.getElementById('sp').value,qty=parseInt(document.getElementById('sq').value),up=parseFloat(document.getElementById('sup').value),pm=document.getElementById('spm').value;
+  const pid=document.getElementById('sp').value,qty=parseInt(document.getElementById('sq').value),up=parseFloat(document.getElementById('sup').value);
+  const pm=P._selPM||'Cash';
   if(!pid)return T.err('Select a product.');if(!qty||qty<1)return T.err('Qty must be at least 1.');if(!up||up<=0)return T.err('Enter a valid price.');
   const prod=(P._prods||[]).find(p=>p.id===pid);if(!prod)return T.err('Product not found.');if(Number(prod.quantity)<qty)return T.err(`Only ${prod.quantity} in stock.`);
   const btn=document.querySelector('#mFt .btn-p');if(btn){btn.disabled=true;btn.textContent='Saving...';}
-
   const sid=SB.genId('S');
   const saleData={id:sid,product_id:pid,product_name:prod.name,quantity:qty,unit_price:up,total:qty*up,
     payment_method:pm,customer:document.getElementById('scust').value.trim()||'Walk-in',
     notes:document.getElementById('snotes').value.trim(),sold_by:App.cu.name,sold_by_id:App.cu.id,
     created_at:new Date().toISOString()};
-
-  // ── OFFLINE: save to queue and update local product cache ──
   if(!Offline.isOnline()){
-    Offline.addToQueue(saleData, {id:pid, deducted:qty});
-    // Update local product list so stock shows correctly offline
+    Offline.addToQueue(saleData,{id:pid,deducted:qty});
     if(P._prods){const i=P._prods.findIndex(p=>p.id===pid);if(i>=0){P._prods[i]={...P._prods[i],quantity:Number(P._prods[i].quantity)-qty,total_sold:(Number(P._prods[i].total_sold||0)+qty)};}}
     if(P._stProds){const i=P._stProds.findIndex(p=>p.id===pid);if(i>=0){P._stProds[i]={...P._stProds[i],quantity:Number(P._stProds[i].quantity)-qty};}}
-    M.close();
-    T.warn(`📡 Offline — sale saved locally. Will sync when you reconnect.`);
-    P.sales();
+    M.close();T.warn('📡 Offline — sale saved locally. Will sync when you reconnect.');P.sales();
     if(btn){btn.disabled=false;btn.textContent='Record Sale ✓';}
     return;
   }
-
-  // ── ONLINE: save to Supabase normally ──
   try{
     await SB.insert('sales',saleData);
     await SB.update('products',`id=eq.${pid}`,{quantity:Number(prod.quantity)-qty,total_sold:Number(prod.total_sold||0)+qty});
     await SB.insert('notifications',{id:SB.genId('N'),message:`🛒 ${App.cu.name} sold ${qty}× ${prod.name} for ${App.fmt(qty*up)} via ${pm}`,type:'sale',read_by:''});
     const newQty=Number(prod.quantity)-qty;
-    if(newQty<=Number(prod.low_alert||5)) await SB.insert('notifications',{id:SB.genId('N'),message:`⚠ Low stock: ${prod.name} now has only ${newQty} units.`,type:'alert',read_by:''});
-    M.close();T.ok(`Sale recorded — ${App.fmt(qty*up)}`);P.sales();
+    if(newQty<=Number(prod.low_alert||5))await SB.insert('notifications',{id:SB.genId('N'),message:`⚠ Low stock: ${prod.name} now has only ${newQty} units.`,type:'alert',read_by:''});
+    M.close();
+    T.ok(`Sale recorded — ${App.fmt(qty*up)}`);
+    P._lastSale=saleData;
+    setTimeout(()=>P.showReceiptModal(saleData),200);
+    P.sales();
   }catch(e){
-    // If Supabase fails despite being "online", queue it
     if(e.message.includes('fetch')||e.message.includes('network')||e.message.includes('Failed')){
       Offline.addToQueue(saleData,{id:pid,deducted:qty});
-      M.close();T.warn('Connection issue — sale saved locally and will sync automatically.');P.sales();
-    } else {
-      T.err('Error: '+e.message);
-    }
+      M.close();T.warn('Connection issue — sale saved locally.');P.sales();
+    }else T.err('Error: '+e.message);
     if(btn){btn.disabled=false;btn.textContent='Record Sale ✓';}
   }
+},
+
+_lastSale:null,
+
+showReceiptModal(sale){
+  const biz=App.cfg?.business||{};
+  M.open('Sale Complete — Send Receipt?',`
+    <div class="receipt-panel">
+      <div class="receipt-prod">${sale.quantity}× ${sale.product_name}</div>
+      <div class="receipt-amt">${App.fmt(sale.total)}</div>
+      <div style="font-size:12px;opacity:.75">${sale.payment_method} · ${App.fmtDT(sale.created_at)}</div>
+      <div class="receipt-id"># ${sale.id.slice(-12).toUpperCase()}</div>
+    </div>
+    <p style="font-size:13px;color:var(--text2);text-align:center;margin-bottom:12px">Does the customer want a receipt?</p>
+    <div class="receipt-actions">
+      <div class="receipt-btn wa" onclick="P.sendWhatsApp()">
+        <span class="rb-icon">💬</span><span>WhatsApp</span>
+        <span style="font-size:10px;color:#15803d;font-weight:400">Free</span>
+      </div>
+      <div class="receipt-btn" onclick="P.sendEmail()">
+        <span class="rb-icon">📧</span><span>Email</span>
+        <span style="font-size:10px;color:var(--text3);font-weight:400">Free</span>
+      </div>
+      <div class="receipt-btn" onclick="P.printInv('${sale.id}');M.close()">
+        <span class="rb-icon">🖨</span><span>Print PDF</span>
+        <span style="font-size:10px;color:var(--text3);font-weight:400">Receipt</span>
+      </div>
+      <div class="receipt-btn" onclick="M.close()">
+        <span class="rb-icon">✕</span><span>No Receipt</span>
+        <span style="font-size:10px;color:var(--text3);font-weight:400">Skip</span>
+      </div>
+    </div>
+    <div id="waInput" class="hidden" style="margin-top:14px">
+      <div class="fg"><label>Customer WhatsApp Number</label>
+        <input type="tel" id="waPhone" placeholder="e.g. 0712 345 678"/>
+      </div>
+      <button class="btn btn-p btn-full" onclick="P.doSendWhatsApp()">Send on WhatsApp →</button>
+    </div>
+    <div id="emailInput" class="hidden" style="margin-top:14px">
+      <div class="fg"><label>Customer Email Address</label>
+        <input type="email" id="custEmail" placeholder="e.g. customer@gmail.com"/>
+      </div>
+      <button class="btn btn-p btn-full" onclick="P.doSendEmail()">Send Email Receipt →</button>
+    </div>`,
+    []);
+},
+
+buildReceiptText(sale,biz){
+  const cur=biz.currency||'KSh';
+  return `*${biz.name||'Smart Books'}*
+${biz.address?biz.address+'
+':''}${biz.phone?'Tel: '+biz.phone+'
+':''}
+RECEIPT
+${'─'.repeat(30)}
+Ref: ${sale.id.slice(-10).toUpperCase()}
+Date: ${new Date(sale.created_at).toLocaleString('en-KE')}
+${'─'.repeat(30)}
+${sale.product_name}
+Qty: ${sale.quantity} × ${cur} ${Number(sale.unit_price).toFixed(2)}
+${'─'.repeat(30)}
+*TOTAL: ${cur} ${Number(sale.total).toFixed(2)}*
+Payment: ${sale.payment_method}
+Served by: ${sale.sold_by}
+${'─'.repeat(30)}
+Thank you for your business! 🙏`;
+},
+
+buildReceiptHtml(sale,biz){
+  const cur=biz.currency||'KSh';
+  return `<div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:20px;border:1px solid #ddd;border-radius:8px">
+    <div style="text-align:center;border-bottom:2px solid #1b4332;padding-bottom:14px;margin-bottom:14px">
+      <h2 style="color:#1b4332;margin:0">${biz.name||'Smart Books'}</h2>
+      ${biz.address?`<p style="color:#666;font-size:12px;margin:4px 0">${biz.address}</p>`:''}
+      ${biz.phone?`<p style="color:#666;font-size:12px;margin:2px 0">Tel: ${biz.phone}</p>`:''}
+      ${biz.email?`<p style="color:#666;font-size:12px;margin:2px 0">${biz.email}</p>`:''}
+    </div>
+    <p style="text-align:center;font-size:18px;font-weight:700;color:#1b4332;margin:0 0 14px">RECEIPT</p>
+    <table style="width:100%;font-size:13px;margin-bottom:14px">
+      <tr><td style="color:#666">Ref No.</td><td style="text-align:right;font-family:monospace">${sale.id.slice(-10).toUpperCase()}</td></tr>
+      <tr><td style="color:#666">Date</td><td style="text-align:right">${new Date(sale.created_at).toLocaleString('en-KE')}</td></tr>
+      <tr><td style="color:#666">Served By</td><td style="text-align:right">${sale.sold_by}</td></tr>
+    </table>
+    <table style="width:100%;border-top:1px solid #ddd;border-bottom:1px solid #ddd;padding:10px 0;margin-bottom:14px">
+      <tr style="font-weight:700"><td>${sale.product_name}</td><td style="text-align:center">${sale.quantity}</td><td style="text-align:right">${cur} ${Number(sale.total).toFixed(2)}</td></tr>
+    </table>
+    <table style="width:100%;font-size:14px">
+      <tr><td><strong>TOTAL</strong></td><td style="text-align:right"><strong>${cur} ${Number(sale.total).toFixed(2)}</strong></td></tr>
+      <tr><td style="color:#666;font-size:12px">Payment Method</td><td style="text-align:right;font-size:12px">${sale.payment_method}</td></tr>
+    </table>
+    <p style="text-align:center;color:#1b4332;font-weight:700;margin-top:16px;font-size:13px">Thank you for your business! 🙏</p>
+    <p style="text-align:center;color:#999;font-size:11px;margin-top:4px">Powered by Smart Books</p>
+  </div>`;
+},
+
+sendWhatsApp(){
+  document.getElementById('waInput')?.classList.remove('hidden');
+  document.getElementById('emailInput')?.classList.add('hidden');
+  setTimeout(()=>document.getElementById('waPhone')?.focus(),100);
+},
+
+doSendWhatsApp(){
+  const phone=document.getElementById('waPhone')?.value.trim().replace(/\s/g,'');
+  if(!phone||phone.length<9)return T.err('Enter a valid phone number.');
+  const sale=P._lastSale;if(!sale)return T.err('Sale data not found.');
+  const biz=App.cfg?.business||{};
+  const waPhone=phone.replace(/^0/,'254').replace(/^\+/,'');
+  const text=encodeURIComponent(P.buildReceiptText(sale,biz));
+  window.open(`https://wa.me/${waPhone}?text=${text}`,'_blank');
+  T.ok('WhatsApp opened — send the receipt!');
+  document.getElementById('waInput')?.classList.add('hidden');
+},
+
+sendEmail(){
+  document.getElementById('emailInput')?.classList.remove('hidden');
+  document.getElementById('waInput')?.classList.add('hidden');
+  setTimeout(()=>document.getElementById('custEmail')?.focus(),100);
+},
+
+doSendEmail(){
+  const email=document.getElementById('custEmail')?.value.trim();
+  if(!email||!email.includes('@'))return T.err('Enter a valid email address.');
+  const sale=P._lastSale;if(!sale)return T.err('Sale data not found.');
+  const biz=App.cfg?.business||{};
+  const ejsKey=biz.emailjs_key,ejsService=biz.emailjs_service,ejsTemplate=biz.emailjs_template;
+  if(!ejsKey||!ejsService||!ejsTemplate){
+    // Fallback: mailto
+    const subject=encodeURIComponent(`Receipt from ${biz.name||'Smart Books'} — ${sale.id.slice(-8).toUpperCase()}`);
+    const body=encodeURIComponent(P.buildReceiptText(sale,biz));
+    window.open(`mailto:${email}?subject=${subject}&body=${body}`,'_blank');
+    T.ok('Mail app opened. Configure EmailJS in Settings for automatic sending.');
+    document.getElementById('emailInput')?.classList.add('hidden');
+    return;
+  }
+  const payload={service_id:ejsService,template_id:ejsTemplate,user_id:ejsKey,
+    template_params:{to_email:email,to_name:sale.customer||'Valued Customer',
+      from_name:biz.name||'Smart Books',business_name:biz.name,business_address:biz.address||'',
+      business_phone:biz.phone||'',business_email:biz.email||'',
+      receipt_id:sale.id.slice(-10).toUpperCase(),product:sale.product_name,
+      quantity:sale.quantity,unit_price:`${biz.currency||'KSh'} ${Number(sale.unit_price).toFixed(2)}`,
+      total:`${biz.currency||'KSh'} ${Number(sale.total).toFixed(2)}`,
+      payment_method:sale.payment_method,served_by:sale.sold_by,
+      sale_date:new Date(sale.created_at).toLocaleString('en-KE'),
+      receipt_html:P.buildReceiptHtml(sale,biz)}};
+  fetch('https://api.emailjs.com/api/v1.0/email/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
+    .then(r=>{if(r.ok){T.ok(`Receipt emailed to ${email} ✓`);document.getElementById('emailInput')?.classList.add('hidden');}
+      else{T.warn('EmailJS error — opening mail app instead...');const s=encodeURIComponent(`Receipt from ${biz.name}`);const b=encodeURIComponent(P.buildReceiptText(sale,biz));window.open(`mailto:${email}?subject=${s}&body=${b}`,'_blank');}})
+    .catch(()=>{T.warn('Email failed — opening mail app.');const s=encodeURIComponent(`Receipt from ${biz.name}`);const b=encodeURIComponent(P.buildReceiptText(sale,biz));window.open(`mailto:${email}?subject=${s}&body=${b}`,'_blank');});
 },
 
 async delSale(id){
