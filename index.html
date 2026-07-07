@@ -322,7 +322,9 @@ create table if not exists products(id text primary key, name text, sku text, ca
 create table if not exists sales(id text primary key, product_id text, product_name text, quantity integer, unit_price numeric, total numeric, payment_method text, customer text, notes text, sold_by text, sold_by_id text, created_at timestamptz default now());
 create table if not exists restocks(id text primary key, product_id text, product_name text, quantity integer, cost_per_unit numeric, total_cost numeric, supplier text, notes text, recorded_by text, created_at timestamptz default now());
 create table if not exists notifications(id text primary key, message text, type text, read_by text default '', created_at timestamptz default now());
-create table if not exists devices(id text primary key, token text, authorized_at timestamptz default now(), ua text);</code>
+create table if not exists devices(id text primary key, token text, authorized_at timestamptz default now(), ua text);
+create table if not exists suppliers(id text primary key, name text, contact_person text, phone text, email text, address text, notes text, active boolean default true, created_at timestamptz default now());
+create table if not exists purchase_orders(id text primary key, supplier_id text, supplier_name text, items jsonb, total_cost numeric default 0, status text default 'pending', notes text, created_by text, created_at timestamptz default now());</code>
     </div>
     <div id="connErr" class="alert a-err hidden"></div>
     <div class="cfg-g">
@@ -866,6 +868,7 @@ const App = {
       {id:'stock',ic:'📦',lbl:'Stock',show:true},
       {id:'reports',ic:'📈',lbl:'Reports',show:u.role==='owner'||u.role==='manager'},
       {id:'team',ic:'👥',lbl:'Team',show:u.role==='owner'},
+      {id:'suppliers',ic:'🚚',lbl:'Suppliers',show:u.role==='owner'},
       {id:'ai',ic:'🤖',lbl:'AI Accountant',show:u.role==='owner'},
       {id:'settings',ic:'⚙',lbl:'Settings',show:u.role==='owner'},
     ].forEach(p => {
@@ -881,9 +884,9 @@ const App = {
     this.currentPage = pg;
     document.querySelectorAll('.ni').forEach(e=>e.classList.remove('active'));
     const b=document.getElementById('nav_'+pg); if(b) b.classList.add('active');
-    document.getElementById('tbTitle').textContent={dashboard:'Dashboard',sales:'Sales',stock:'Stock',reports:'Reports',team:'Team',ai:'AI Accountant',settings:'Settings'}[pg]||pg;
+    document.getElementById('tbTitle').textContent={dashboard:'Dashboard',sales:'Sales',stock:'Stock',reports:'Reports',team:'Team',suppliers:'Suppliers',ai:'AI Accountant',settings:'Settings'}[pg]||pg;
     document.getElementById('mc').innerHTML='';
-    ({dashboard:P.dashboard,sales:P.sales,stock:P.stock,reports:P.reports,team:P.team,ai:P.ai,settings:P.settings}[pg]||P.dashboard)();
+    ({dashboard:P.dashboard,sales:P.sales,stock:P.stock,reports:P.reports,team:P.team,suppliers:P.suppliers,ai:P.ai,settings:P.settings}[pg]||P.dashboard)();
     if(window.innerWidth<=768) document.getElementById('sidebar').classList.remove('open');
   },
 
@@ -1324,9 +1327,11 @@ async delSale(id){
 },
 
 async newRestock(preselectId=null){
-  let prods;try{prods=await SB.select('products','active=eq.true','name.asc');}catch(e){return T.err('Could not load products.');}
+  let prods,suppliers;
+  try{[prods,suppliers]=await Promise.all([SB.select('products','active=eq.true','name.asc'),SB.select('suppliers','active=eq.true','name.asc')]);}
+  catch(e){prods=[];suppliers=[];}
   if(!prods.length)return T.warn('No products found. Add products first.');
-  P._rsProds=prods;
+  P._rsProds=prods;P._rsSuppliers=suppliers;
   M.open('Add Stock / Restock',`
     <div class="alert a-info" style="font-size:12px">⚠ This adds units to an <strong>existing product</strong>. Use <em>Add New Product</em> only for items never stocked before.</div>
     <div class="fg"><label>Which Product? *</label>
@@ -1342,9 +1347,19 @@ async newRestock(preselectId=null){
       <div class="fg"><label>Quantity to Add *</label><input type="number" id="rq" min="1" value="1" oninput="P._rsChg()"/></div>
       <div class="fg"><label>Cost Per Unit</label><input type="number" id="rc" min="0" step="0.01" placeholder="0.00"/></div>
     </div>
-    <div class="fg"><label>Supplier <span class="lh">(optional)</span></label><input type="text" id="rs" placeholder="e.g. Nairobi Wholesalers"/></div>
+    <div class="fg"><label>Supplier <span class="lh">(optional)</span></label>
+      <input type="text" id="rs" placeholder="Type or select a supplier..." list="suppliersList"/>
+      <datalist id="suppliersList" id="suppliersDL"></datalist>
+      <small>Start typing to see your saved suppliers, or type any name.</small>
+    </div>
     <div class="fg"><label>Notes <span class="lh">(optional)</span></label><input type="text" id="rn" placeholder="Invoice no., delivery note, etc."/></div>`,
     [{lbl:'Cancel',cls:'btn-o',fn:'M.close()'},{lbl:'Add Stock ✓',cls:'btn-p',fn:'P.saveRestock()'}]);
+  // Populate supplier datalist
+  setTimeout(()=>{
+    const dl=document.getElementById('suppliersDL');
+    if(dl&&P._rsSuppliers){P._rsSuppliers.forEach(s=>{const o=document.createElement('option');o.value=s.name;dl.appendChild(o);});}
+  },100);
+  P._rsSuppliers=suppliers||[];
 },
 
 _rsChg(){
@@ -2086,6 +2101,191 @@ async aiSaveKey(){
   M.close();T.ok('Groq API key saved!');P.ai();
 },
 
+// ─── SUPPLIERS ───
+async suppliers(){
+  const mc=document.getElementById('mc'),canEdit=App.cu.role==='owner';
+  mc.innerHTML=`
+    <div class="pg-hd">
+      <div><h2>Suppliers</h2><p>Manage your suppliers and purchase records</p></div>
+      <div class="pg-act">
+        <button class="btn btn-p" onclick="P.newSupplier()">+ Add Supplier</button>
+      </div>
+    </div>
+    <div class="g2" style="margin-bottom:14px">
+      <div class="card" id="supplierList"><div class="empty"><div class="spin" style="margin:0 auto"></div></div></div>
+      <div class="card" id="supplierDetail" style="display:flex;flex-direction:column;gap:12px">
+        <div class="empty" style="padding:30px">
+          <div class="ei">🚚</div>
+          <p>Select a supplier to view details and purchase history</p>
+        </div>
+      </div>
+    </div>
+    <div class="card mt">
+      <div class="card-ttl">Purchase History (All Restocks)</div>
+      <div class="tw" id="purchaseTbl"><div class="empty"><div class="spin" style="margin:0 auto"></div></div></div>
+    </div>`;
+
+  P._suppliers = [];
+  try {
+    const [suppliers, restocks] = await Promise.all([
+      SB.select('suppliers','active=eq.true','name.asc'),
+      SB.select('restocks','','created_at.desc')
+    ]);
+    P._suppliers = suppliers;
+    P._renderSupplierList(suppliers);
+    P._renderPurchaseHistory(restocks);
+  } catch(e) { T.err('Error loading suppliers: '+e.message); }
+},
+
+_suppliers:[],
+_activeSupplier:null,
+
+_renderSupplierList(suppliers){
+  const el=document.getElementById('supplierList');if(!el)return;
+  if(!suppliers.length){
+    el.innerHTML=`<div class="empty"><div class="ei">🚚</div><p>No suppliers yet.</p><button class="btn btn-p mt" onclick="P.newSupplier()">Add First Supplier</button></div>`;
+    return;
+  }
+  el.innerHTML=`
+    <div class="card-ttl">Your Suppliers (${suppliers.length})</div>
+    <div style="display:flex;flex-direction:column;gap:6px">
+      ${suppliers.map(s=>`
+        <div class="supplier-row" id="srow_${s.id}" onclick="P._viewSupplier('${s.id}')" style="padding:12px;border:1.5px solid var(--border);border-radius:9px;cursor:pointer;transition:all .18s">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div>
+              <div style="font-weight:600;color:var(--text)">${s.name}</div>
+              <div style="font-size:12px;color:var(--text3)">${s.contact_person||''} ${s.phone?'· '+s.phone:''}</div>
+            </div>
+            <span style="font-size:18px">›</span>
+          </div>
+        </div>`).join('')}
+    </div>`;
+},
+
+_viewSupplier(id){
+  const s=P._suppliers.find(x=>x.id===id);if(!s)return;
+  P._activeSupplier=s;
+  // Highlight selected
+  document.querySelectorAll('.supplier-row').forEach(r=>r.style.borderColor='var(--border)');
+  const row=document.getElementById('srow_'+id);
+  if(row)row.style.borderColor='var(--green)';
+  const el=document.getElementById('supplierDetail');if(!el)return;
+  el.innerHTML=`
+    <div class="card-ttl" style="margin-bottom:0">${s.name}</div>
+    ${[
+      ['Contact Person', s.contact_person||'—'],
+      ['Phone', s.phone||'—'],
+      ['Email', s.email||'—'],
+      ['Address', s.address||'—'],
+      ['Notes', s.notes||'—'],
+    ].map(([l,v])=>`
+      <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px">
+        <span style="color:var(--text2)">${l}</span>
+        <span style="font-weight:500;max-width:60%;text-align:right">${v}</span>
+      </div>`).join('')}
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <button class="btn btn-g btn-sm" onclick="P.editSupplier('${s.id}')">Edit</button>
+      <button class="btn btn-d btn-sm" onclick="P.deleteSupplier('${s.id}','${(s.name||'').replace(/'/g,"\'")}')">Remove</button>
+      ${s.phone?`<a class="btn btn-sm" style="background:#25d366;color:#fff" href="https://wa.me/${s.phone.replace(/^0/,'254').replace(/\s/g,'')}" target="_blank">💬 WhatsApp</a>`:''}
+      ${s.phone?`<a class="btn btn-sm" style="background:var(--blue);color:#fff" href="tel:${s.phone}">📞 Call</a>`:''}
+    </div>`;
+},
+
+_renderPurchaseHistory(restocks){
+  const el=document.getElementById('purchaseTbl');if(!el)return;
+  if(!restocks.length){el.innerHTML='<div class="empty"><p>No purchase records yet. They appear here when you restock products and enter a supplier name.</p></div>';return;}
+  el.innerHTML=`<table>
+    <thead><tr><th>Date</th><th>Product</th><th>Qty Added</th><th>Cost/Unit</th><th>Total Cost</th><th>Supplier</th><th>Recorded By</th><th>Notes</th></tr></thead>
+    <tbody>
+      ${restocks.map(r=>`<tr>
+        <td>${App.fmtD(r.created_at)}</td>
+        <td><strong>${r.product_name}</strong></td>
+        <td>${r.quantity}</td>
+        <td>${App.fmt(r.cost_per_unit||0)}</td>
+        <td><strong>${App.fmt(r.total_cost||0)}</strong></td>
+        <td>${r.supplier?`<span class="bdg bdg-info">${r.supplier}</span>`:'<span class="muted">—</span>'}</td>
+        <td>${r.recorded_by||'—'}</td>
+        <td class="muted sm">${r.notes||'—'}</td>
+      </tr>`).join('')}
+    </tbody>
+    <tfoot>
+      <tr style="background:var(--bg2);font-weight:600">
+        <td colspan="4" style="text-align:right;padding:10px 12px">Total Restock Cost:</td>
+        <td style="padding:10px 12px">${App.fmt(restocks.reduce((s,r)=>s+Number(r.total_cost||0),0))}</td>
+        <td colspan="3"></td>
+      </tr>
+    </tfoot>
+  </table>`;
+},
+
+supplierForm(s={}){
+  return`
+    <div class="fg"><label>Supplier / Company Name *</label><input type="text" id="supName" value="${s.name||''}" placeholder="e.g. Nairobi Wholesalers Ltd"/></div>
+    <div class="g2">
+      <div class="fg"><label>Contact Person</label><input type="text" id="supContact" value="${s.contact_person||''}" placeholder="e.g. James Mwangi"/></div>
+      <div class="fg"><label>Phone Number</label><input type="tel" id="supPhone" value="${s.phone||''}" placeholder="e.g. 0712 345 678"/></div>
+    </div>
+    <div class="g2">
+      <div class="fg"><label>Email Address</label><input type="email" id="supEmail" value="${s.email||''}" placeholder="e.g. orders@company.com"/></div>
+      <div class="fg"><label>Town / Address</label><input type="text" id="supAddr" value="${s.address||''}" placeholder="e.g. Gikomba, Nairobi"/></div>
+    </div>
+    <div class="fg"><label>Notes <span class="lh">(payment terms, delivery days, etc.)</span></label>
+      <textarea id="supNotes" rows="2" placeholder="e.g. Pays within 30 days. Delivers every Tuesday.">${s.notes||''}</textarea>
+    </div>`;
+},
+
+newSupplier(){
+  M.open('Add New Supplier',P.supplierForm(),[
+    {lbl:'Cancel',cls:'btn-o',fn:'M.close()'},
+    {lbl:'Save Supplier',cls:'btn-p',fn:'P.saveSupplier()'}
+  ]);
+},
+
+editSupplier(id){
+  const s=P._suppliers.find(x=>x.id===id);if(!s)return;
+  M.open('Edit Supplier',P.supplierForm(s),[
+    {lbl:'Cancel',cls:'btn-o',fn:'M.close()'},
+    {lbl:'Save Changes',cls:'btn-p',fn:`P.saveSupplier('${id}')`}
+  ]);
+},
+
+async saveSupplier(eid=null){
+  const name=document.getElementById('supName').value.trim();
+  if(!name)return T.err('Supplier name is required.');
+  const data={
+    name,
+    contact_person:document.getElementById('supContact').value.trim(),
+    phone:document.getElementById('supPhone').value.trim(),
+    email:document.getElementById('supEmail').value.trim(),
+    address:document.getElementById('supAddr').value.trim(),
+    notes:document.getElementById('supNotes').value.trim(),
+    active:true
+  };
+  const btn=document.querySelector('#mFt .btn-p');
+  if(btn){btn.disabled=true;btn.textContent='Saving...';}
+  try{
+    if(eid){
+      await SB.update('suppliers',`id=eq.${eid}`,data);
+      T.ok('Supplier updated.');
+    } else {
+      await SB.insert('suppliers',{...data,id:SB.genId('SUP'),created_at:new Date().toISOString()});
+      T.ok('Supplier added!');
+    }
+    M.close();
+    P.suppliers();
+  }catch(e){
+    T.err('Error: '+e.message);
+    if(btn){btn.disabled=false;btn.textContent='Save Supplier';}
+  }
+},
+
+async deleteSupplier(id,name){
+  if(!confirm(`Remove "${name}" from your suppliers?`))return;
+  await SB.update('suppliers',`id=eq.${id}`,{active:false});
+  T.ok('Supplier removed.');
+  P.suppliers();
+},
+
 // ─── SETTINGS ───
 async settings(){
   const mc=document.getElementById('mc'),biz=App.cfg?.business||{};
@@ -2133,10 +2333,34 @@ async settings(){
 
 async saveBiz(){
   const name=document.getElementById('sbn').value.trim();if(!name)return T.err('Name required.');
-  const biz={name,address:document.getElementById('sba').value.trim(),phone:document.getElementById('sbp').value.trim(),email:document.getElementById('sbe').value.trim(),currency:document.getElementById('sbc').value.trim()||'KSh',kra:document.getElementById('sbk').value.trim()};
+  const biz={...App.cfg.business||{},name,address:document.getElementById('sba').value.trim(),phone:document.getElementById('sbp').value.trim(),email:document.getElementById('sbe').value.trim(),currency:document.getElementById('sbc').value.trim()||'KSh',kra:document.getElementById('sbk').value.trim()};
   await SB.setConfig('business',JSON.stringify(biz));
   App.cfg.business=biz;localStorage.setItem('sb_appcfg',JSON.stringify(App.cfg));
   document.getElementById('sbBiz').textContent=biz.name;T.ok('Business info saved!');
+},
+
+async saveMpesa(){
+  const biz={...App.cfg.business||{}};
+  const v=id=>document.getElementById(id)?.value.trim()||'';
+  biz.mpesa_till=v('mpTill');biz.mpesa_paybill=v('mpPaybill');
+  biz.mpesa_pochi=v('mpPochi');biz.mpesa_phone=v('mpPhone');
+  biz.mpesa_account=v('mpAccount');
+  biz.daraja_key=v('mpDarajaKey');biz.daraja_secret=v('mpDarajaSecret');
+  biz.daraja_password=v('mpDarajaPass');
+  biz.daraja_base=document.getElementById('mpDarajaEnv')?.value||'https://sandbox.safaricom.co.ke';
+  await SB.setConfig('business',JSON.stringify(biz));
+  App.cfg.business=biz;localStorage.setItem('sb_appcfg',JSON.stringify(App.cfg));
+  T.ok('Mpesa settings saved!');
+},
+
+async saveEmailJS(){
+  const biz={...App.cfg.business||{}};
+  biz.emailjs_key=document.getElementById('ejsKey')?.value.trim()||'';
+  biz.emailjs_service=document.getElementById('ejsService')?.value.trim()||'';
+  biz.emailjs_template=document.getElementById('ejsTemplate')?.value.trim()||'';
+  await SB.setConfig('business',JSON.stringify(biz));
+  App.cfg.business=biz;localStorage.setItem('sb_appcfg',JSON.stringify(App.cfg));
+  T.ok('EmailJS settings saved! Test by sending a receipt from any sale.');
 },
 
 async changePass(){
