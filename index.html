@@ -306,6 +306,9 @@ tr:last-child td{border-bottom:none}tbody tr:hover{background:var(--bg)}
       <div class="brand-ico" style="display:inline-flex">₦</div>
       <h2 style="margin-top:9px">Connect to Supabase</h2>
       <p class="conn-sub">Free database — no card needed. Takes 3 minutes to set up once.</p>
+    <div id="connResumeAlert" class="hidden" style="background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0;border-radius:8px;padding:10px 14px;font-size:13px;margin-bottom:14px">
+      ✓ Your credentials are already saved below. Click <strong>Connect to Supabase</strong> to reconnect.
+    </div>
     </div>
     <ol class="steps-ol">
       <li>Go to <a href="https://supabase.com" target="_blank">supabase.com</a> → <strong>Start your project</strong> → sign up free with email.</li>
@@ -332,6 +335,11 @@ create table if not exists purchase_orders(id text primary key, supplier_id text
       <div class="fg"><label>Anon Public Key</label><input type="text" id="cfgKey" placeholder="eyJhbGciOiJIUzI1NiIs..."/></div>
     </div>
     <button class="btn btn-p btn-full" onclick="CONN.save()">Connect to Supabase →</button>
+    <div style="text-align:center;margin-top:14px">
+      <button onclick="CONN.resetAndClear()" style="background:none;border:none;color:var(--text3);font-size:12px;cursor:pointer;text-decoration:underline">
+        Clear saved credentials and start over
+      </button>
+    </div>
   </div>
 </div>
 
@@ -559,12 +567,35 @@ const CFG = {
 //  CONNECT SCREEN
 // ══════════════════════════════════════════════════════
 const CONN = {
+  prefill() {
+    const saved = CFG.get();
+    if (saved && saved.url && saved.key) {
+      const urlEl = document.getElementById('cfgUrl');
+      const keyEl = document.getElementById('cfgKey');
+      if (urlEl) urlEl.value = saved.url;
+      if (keyEl) keyEl.value = saved.key;
+      const alert = document.getElementById('connResumeAlert');
+      if (alert) alert.classList.remove('hidden');
+    }
+  },
+
+  resetAndClear() {
+    if (!confirm('This will clear your saved Supabase credentials. You will need to enter them again. Continue?')) return;
+    CFG.clear();
+    // Clear all caches
+    ['sb_appcfg','lkc_cfg','sb_cfg_cache','lkc_cfg_cache','sb_da','lkc_da'].forEach(k => localStorage.removeItem(k));
+    document.getElementById('cfgUrl').value = '';
+    document.getElementById('cfgKey').value = '';
+    document.getElementById('connErr').classList.add('hidden');
+    T.ok('Credentials cleared. Enter your Supabase details to reconnect.');
+  },
+
   async save() {
     const url = document.getElementById('cfgUrl').value.trim();
     const key = document.getElementById('cfgKey').value.trim();
     const err = document.getElementById('connErr');
     if (!url || !key) { err.textContent = 'Please fill in both fields.'; err.classList.remove('hidden'); return; }
-    if (!url.includes('supabase.co')) { err.textContent = 'URL should end in .supabase.co'; err.classList.remove('hidden'); return; }
+    if (!url.includes('supabase.co')) { err.textContent = 'URL should end in .supabase.co — check your Supabase Project Settings → API'; err.classList.remove('hidden'); return; }
     err.classList.add('hidden');
     const btn = document.querySelector('#connScreen .btn-p');
     btn.textContent = 'Testing...'; btn.disabled = true;
@@ -712,37 +743,69 @@ const App = {
 
   async boot() {
     splash('Starting up...');
+
+    // ── Step 1: Check Supabase credentials exist ──
     const sbCfg = CFG.get();
     if (!sbCfg) { hideSplash(); show('connScreen'); return; }
     SB.init(sbCfg.url, sbCfg.key);
 
-    // Try cache first
-    const cached = localStorage.getItem('sb_appcfg');
-    if (cached) {
+    // ── Step 2: Try ALL cache keys (handles renamed keys across versions) ──
+    const cacheKeys = ['sb_appcfg','lkc_cfg','sb_cfg_cache','lkc_cfg_cache'];
+    let cachedCfg = null;
+    for (const k of cacheKeys) {
       try {
-        const c = JSON.parse(cached);
-        if (c.setup_done === 'true') {
-          this.cfg = c;
-          hideSplash();
-          this._showLogin(c);
-          // Refresh in background
-          this._refreshCfg();
-          return;
+        const raw = localStorage.getItem(k);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          // Accept if setup_done is truthy in any form
+          if (parsed.setup_done === 'true' || parsed.setup_done === true) {
+            cachedCfg = parsed;
+            break;
+          }
         }
       } catch(e) {}
     }
 
-    // No cache — fetch from Supabase
-    splash('Connecting...');
+    if (cachedCfg) {
+      this.cfg = cachedCfg;
+      hideSplash();
+      this._showLogin(cachedCfg);
+      // Refresh config silently in background
+      this._refreshCfg().catch(() => {});
+      return;
+    }
+
+    // ── Step 3: No valid cache — fetch live from Supabase with timeout ──
+    splash('Connecting to database...');
     try {
-      await this._refreshCfg();
+      // 10 second timeout so it never hangs forever
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Connection timed out. Check your internet connection.')), 10000)
+      );
+      await Promise.race([this._refreshCfg(), timeoutPromise]);
+
       const c = this.cfg;
-      if (!c || c.setup_done !== 'true') { hideSplash(); show('setupScreen'); return; }
-      hideSplash(); this._showLogin(c);
+      const isSetup = c && (c.setup_done === 'true' || c.setup_done === true);
+
+      if (!isSetup) {
+        hideSplash();
+        show('setupScreen');
+      } else {
+        hideSplash();
+        this._showLogin(c);
+      }
     } catch(e) {
-      hideSplash(); show('connScreen');
-      document.getElementById('connErr').textContent = 'Could not connect: ' + e.message;
-      document.getElementById('connErr').classList.remove('hidden');
+      hideSplash();
+      show('connScreen');
+      const errEl = document.getElementById('connErr');
+      if (errEl) {
+        errEl.innerHTML = `<strong>Could not connect to your database.</strong><br>${e.message}<br><br>
+          <small>Check that:<br>
+          • Your internet is working<br>
+          • Your Supabase URL and key are correct<br>
+          • Your Supabase project is active (free projects pause after 1 week of inactivity)</small>`;
+        errEl.classList.remove('hidden');
+      }
     }
   },
 
@@ -750,8 +813,15 @@ const App = {
     const rows = await SB.select('app_config');
     const map = {};
     rows.forEach(r => { map[r.key] = r.value; });
-    const biz = map.business ? JSON.parse(map.business) : {};
-    this.cfg = { setup_done: map.setup_done, admin_hash: map.admin_hash, business: biz, groq_key: map.groq_key || '' };
+    let biz = {};
+    try { biz = map.business ? JSON.parse(map.business) : {}; } catch(e) {}
+    this.cfg = {
+      setup_done: map.setup_done,
+      admin_hash: map.admin_hash,
+      business: biz,
+      groq_key: map.groq_key || ''
+    };
+    // Save under the canonical key
     localStorage.setItem('sb_appcfg', JSON.stringify(this.cfg));
   },
 
@@ -2417,7 +2487,7 @@ printInv(saleId){
 // ══════════════════════════════════════════════════════
 function splash(msg){document.getElementById('splashMsg').textContent=msg||'Loading...';document.getElementById('splash').classList.remove('hidden');}
 function hideSplash(){document.getElementById('splash').classList.add('hidden');}
-function show(id){['splash','connScreen','setupScreen','loginScreen','appShell'].forEach(s=>document.getElementById(s).classList.add('hidden'));document.getElementById(id).classList.remove('hidden');}
+function show(id){['splash','connScreen','setupScreen','loginScreen','appShell'].forEach(s=>document.getElementById(s).classList.add('hidden'));document.getElementById(id).classList.remove('hidden');if(id==='connScreen')setTimeout(()=>CONN.prefill(),50);}
 function setSyncState(state){const d=document.getElementById('sdot'),t=document.getElementById('stxt');if(!d)return;if(state==='busy'){d.className='sdot busy';if(t)t.textContent='Syncing...';}else if(state==='err'){d.className='sdot err';if(t)t.textContent='Error';}else{d.className='sdot';if(t)t.textContent='Ready';}}
 
 // ══════════════════════════════════════════════════════
