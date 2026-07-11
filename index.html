@@ -793,6 +793,7 @@ const App = {
       } else {
         hideSplash();
         this._showLogin(c);
+        this._autoMigrate().catch(()=>{});
       }
     } catch(e) {
       hideSplash();
@@ -821,8 +822,55 @@ const App = {
       business: biz,
       groq_key: map.groq_key || ''
     };
-    // Save under the canonical key
     localStorage.setItem('sb_appcfg', JSON.stringify(this.cfg));
+  },
+
+  // Auto-create any missing tables — runs silently on every boot
+  async _autoMigrate() {
+    const sql = `
+      create table if not exists app_config(key text primary key, value text);
+      create table if not exists users(id text primary key, name text, password text, role text, active boolean default true, created_at timestamptz default now());
+      create table if not exists products(id text primary key, name text, sku text, category text, cost_price numeric default 0, selling_price numeric default 0, quantity integer default 0, low_alert integer default 5, total_sold integer default 0, active boolean default true, created_at timestamptz default now());
+      create table if not exists sales(id text primary key, invoice_number text, product_id text, product_name text, quantity integer, unit_price numeric, total numeric, payment_method text, customer text, notes text, sold_by text, sold_by_id text, created_at timestamptz default now());
+      create table if not exists restocks(id text primary key, product_id text, product_name text, quantity integer, cost_per_unit numeric, total_cost numeric, supplier text, notes text, recorded_by text, created_at timestamptz default now());
+      create table if not exists notifications(id text primary key, message text, type text, read_by text default '', created_at timestamptz default now());
+      create table if not exists devices(id text primary key, token text, authorized_at timestamptz default now(), ua text);
+      create table if not exists suppliers(id text primary key, name text, contact_person text, phone text, email text, address text, notes text, active boolean default true, created_at timestamptz default now());
+      create table if not exists payroll(id text primary key, employee_id text, employee_name text, month text, year integer, basic_salary numeric default 0, allowances numeric default 0, gross_salary numeric default 0, paye numeric default 0, nhif numeric default 0, nssf numeric default 0, other_deductions numeric default 0, net_salary numeric default 0, status text default 'draft', paid_at timestamptz, notes text, created_by text, created_at timestamptz default now());
+    `;
+    try {
+      // Use Supabase REST SQL endpoint
+      const sbCfg = CFG.get();
+      if (!sbCfg) return;
+      const resp = await fetch(`${sbCfg.url}/rest/v1/rpc/exec_sql`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'apikey': sbCfg.key, 'Authorization': 'Bearer ' + sbCfg.key },
+        body: JSON.stringify({ sql })
+      });
+      // If exec_sql doesn't exist, try each table via a test select
+      if (!resp.ok) {
+        await this._ensureTables();
+      }
+    } catch(e) {
+      await this._ensureTables();
+    }
+  },
+
+  async _ensureTables() {
+    // Verify each table exists by trying a select — errors are swallowed
+    const tables = ['suppliers','payroll'];
+    for (const t of tables) {
+      try { await SB.select(t,'','created_at.desc'); } catch(e) {
+        // Table missing — show a one-time notice to the owner
+        if (App.cu?.role === 'owner') {
+          const noticed = localStorage.getItem('sb_migrate_notice');
+          if (!noticed) {
+            localStorage.setItem('sb_migrate_notice', '1');
+            T.warn('Some tables are missing. Go to Settings → Run Database Setup to fix this.');
+          }
+        }
+      }
+    }
   },
 
   _showLogin(cfg) {
@@ -939,6 +987,7 @@ const App = {
       {id:'reports',ic:'📈',lbl:'Reports',show:u.role==='owner'||u.role==='manager'},
       {id:'team',ic:'👥',lbl:'Team',show:u.role==='owner'},
       {id:'suppliers',ic:'🚚',lbl:'Suppliers',show:u.role==='owner'},
+      {id:'payroll',ic:'💼',lbl:'Payroll',show:u.role==='owner'},
       {id:'ai',ic:'🤖',lbl:'AI Accountant',show:u.role==='owner'},
       {id:'settings',ic:'⚙',lbl:'Settings',show:u.role==='owner'},
     ].forEach(p => {
@@ -954,9 +1003,9 @@ const App = {
     this.currentPage = pg;
     document.querySelectorAll('.ni').forEach(e=>e.classList.remove('active'));
     const b=document.getElementById('nav_'+pg); if(b) b.classList.add('active');
-    document.getElementById('tbTitle').textContent={dashboard:'Dashboard',sales:'Sales',stock:'Stock',reports:'Reports',team:'Team',suppliers:'Suppliers',ai:'AI Accountant',settings:'Settings'}[pg]||pg;
+    document.getElementById('tbTitle').textContent={dashboard:'Dashboard',sales:'Sales',stock:'Stock',reports:'Reports',team:'Team',suppliers:'Suppliers',payroll:'Payroll',ai:'AI Accountant',settings:'Settings'}[pg]||pg;
     document.getElementById('mc').innerHTML='';
-    ({dashboard:P.dashboard,sales:P.sales,stock:P.stock,reports:P.reports,team:P.team,suppliers:P.suppliers,ai:P.ai,settings:P.settings}[pg]||P.dashboard)();
+    ({dashboard:P.dashboard,sales:P.sales,stock:P.stock,reports:P.reports,team:P.team,suppliers:P.suppliers,payroll:P.payroll,ai:P.ai,settings:P.settings}[pg]||P.dashboard)();
     if(window.innerWidth<=768) document.getElementById('sidebar').classList.remove('open');
   },
 
@@ -1061,7 +1110,7 @@ renderSalesTbl(){
   if(!s.length){el.innerHTML='<div class="empty"><div class="ei">🛒</div><p>No sales found.</p></div>';return;}
   el.innerHTML=`<table><thead><tr><th>ID</th><th>Product</th><th>Qty</th><th>Unit Price</th><th>Total</th><th>Payment</th><th>Customer</th><th>Sold By</th><th>Date/Time</th><th>Actions</th></tr></thead><tbody>
     ${s.map(x=>`<tr>
-      <td class="mono muted">${x.id.slice(-8)}</td>
+      <td class="mono" style="font-weight:600;color:var(--green)">#${x.invoice_number||x.id.slice(-6).toUpperCase()}</td>
       <td><strong>${x.product_name}</strong></td><td>${x.quantity}</td>
       <td>${App.fmt(x.unit_price)}</td><td><strong>${App.fmt(x.total)}</strong></td>
       <td><span class="bdg bdg-info">${App.payIco(x.payment_method)} ${x.payment_method}</span></td>
@@ -1211,7 +1260,15 @@ async saveSale(){
   const prod=(P._prods||[]).find(p=>p.id===pid);if(!prod)return T.err('Product not found.');if(Number(prod.quantity)<qty)return T.err(`Only ${prod.quantity} in stock.`);
   const btn=document.querySelector('#mFt .btn-p');if(btn){btn.disabled=true;btn.textContent='Saving...';}
   const sid=SB.genId('S');
-  const saleData={id:sid,product_id:pid,product_name:prod.name,quantity:qty,unit_price:up,total:qty*up,
+  // Get sequential invoice number using a counter (race-condition safe)
+  let invNum = '001';
+  try {
+    const counterRow = await SB.getConfig('invoice_counter');
+    const next = (parseInt(counterRow||'0') + 1);
+    await SB.setConfig('invoice_counter', String(next));
+    invNum = String(next).padStart(4,'0'); // 0001, 0002, 0003...
+  } catch(e) { invNum = Date.now().toString().slice(-4); }
+  const saleData={id:sid,invoice_number:invNum,product_id:pid,product_name:prod.name,quantity:qty,unit_price:up,total:qty*up,
     payment_method:pm,customer:document.getElementById('scust').value.trim()||'Walk-in',
     notes:document.getElementById('snotes').value.trim(),sold_by:App.cu.name,sold_by_id:App.cu.id,
     created_at:new Date().toISOString()};
@@ -1252,7 +1309,7 @@ showReceiptModal(sale){
       <div class="receipt-prod">${sale.quantity}× ${sale.product_name}</div>
       <div class="receipt-amt">${App.fmt(sale.total)}</div>
       <div style="font-size:12px;opacity:.75">${sale.payment_method} · ${App.fmtDT(sale.created_at)}</div>
-      <div class="receipt-id"># ${sale.id.slice(-12).toUpperCase()}</div>
+      <div class="receipt-id">Invoice # ${sale.invoice_number||sale.id.slice(-8).toUpperCase()}</div>
     </div>
     <p style="font-size:13px;color:var(--text2);text-align:center;margin-bottom:12px">Does the customer want a receipt?</p>
     <div class="receipt-actions">
@@ -1299,7 +1356,7 @@ buildReceiptText(sale,biz){
     '',
     'RECEIPT',
     line,
-    'Ref: '+sale.id.slice(-10).toUpperCase(),
+    'Invoice #: '+(sale.invoice_number||sale.id.slice(-8).toUpperCase()),
     'Date: '+new Date(sale.created_at).toLocaleString('en-KE'),
     line,
     sale.product_name,
@@ -1324,7 +1381,7 @@ buildReceiptHtml(sale,biz){
     '</div>'+
     '<div style="text-align:center;margin-bottom:14px">'+
     '<div style="font-size:11px;color:#999;text-transform:uppercase;letter-spacing:.08em">Receipt</div>'+
-    '<div style="font-size:11px;color:#999;margin-top:2px">'+sale.id.slice(-10).toUpperCase()+'</div>'+
+    '<div style="font-size:11px;color:#999;margin-top:2px">Invoice # '+(sale.invoice_number||sale.id.slice(-8).toUpperCase())+'</div>'+
     '<div style="font-size:11px;color:#999">'+new Date(sale.created_at).toLocaleString('en-KE')+'</div>'+
     '</div>'+
     '<table style="width:100%;border-collapse:collapse;margin-bottom:14px">'+
@@ -1349,14 +1406,27 @@ doSendWhatsApp(){
   const biz=App.cfg?.business||{};
   const waPhone=phone.replace(/^0/,'254').replace(/^\+/,'');
   const text=encodeURIComponent(P.buildReceiptText(sale,biz));
-  window.open(`https://wa.me/${waPhone}?text=${text}`,'_blank');
+  // Use anchor click instead of window.open — avoids popup blocker
+  const a=document.createElement('a');
+  a.href=`https://wa.me/${waPhone}?text=${text}`;
+  a.target='_blank';a.rel='noopener';
+  document.body.appendChild(a);a.click();document.body.removeChild(a);
   T.ok('WhatsApp opened — send the receipt!');
   document.getElementById('waInput')?.classList.add('hidden');
 },
 
+sendWhatsApp(){
+  // Toggle WhatsApp input panel in receipt modal
+  const wa = document.getElementById('waInput');
+  const em = document.getElementById('emailInput');
+  if(wa) { wa.classList.toggle('hidden'); if(em) em.classList.add('hidden'); }
+  setTimeout(()=>document.getElementById('waPhone')?.focus(),100);
+},
+
 sendEmail(){
-  document.getElementById('emailInput')?.classList.remove('hidden');
-  document.getElementById('waInput')?.classList.add('hidden');
+  const em = document.getElementById('emailInput');
+  const wa = document.getElementById('waInput');
+  if(em) { em.classList.toggle('hidden'); if(wa) wa.classList.add('hidden'); }
   setTimeout(()=>document.getElementById('custEmail')?.focus(),100);
 },
 
@@ -2356,20 +2426,490 @@ async deleteSupplier(id,name){
   P.suppliers();
 },
 
+
+// ─── PAYROLL ───
+async payroll(){
+  const mc=document.getElementById('mc');
+  const now=new Date();
+  const months=['January','February','March','April','May','June','July','August','September','October','November','December'];
+  mc.innerHTML=`
+    <div class="pg-hd">
+      <div><h2>Payroll</h2><p>Process monthly salaries — PAYE, NHIF & NSSF calculated automatically</p></div>
+      <div class="pg-act">
+        <button class="btn btn-p" onclick="P.newPayrollRun()">+ Process Month</button>
+      </div>
+    </div>
+
+    <div class="stats-grid" id="prStats">
+      <div class="sc bl"><div class="sc-ico">💼</div><div class="sc-val" id="prEmpCount">—</div><div class="sc-lbl">Employees</div></div>
+      <div class="sc ok"><div class="sc-ico">💰</div><div class="sc-val" id="prGross">—</div><div class="sc-lbl">Gross This Month</div></div>
+      <div class="sc red"><div class="sc-ico">📋</div><div class="sc-val" id="prPAYE">—</div><div class="sc-lbl">PAYE This Month</div></div>
+      <div class="sc acc"><div class="sc-ico">🏦</div><div class="sc-val" id="prNet">—</div><div class="sc-lbl">Net Payable</div></div>
+    </div>
+
+    <div class="alert a-info mb sm">
+      <strong>Kenya Payroll Deductions (2024):</strong>
+      PAYE (KRA bands) · NHIF: KSh 150–1,700 based on gross · NSSF: KSh 200 (Tier I) + 6% up to KSh 18,000 (Tier II)
+    </div>
+
+    <div class="filter-bar">
+      <select id="prMonth" onchange="P.loadPayroll()" style="max-width:160px">
+        ${months.map((m,i)=>`<option value="${i+1}" ${i===now.getMonth()?'selected':''}>${m}</option>`).join('')}
+      </select>
+      <select id="prYear" onchange="P.loadPayroll()" style="max-width:110px">
+        ${[now.getFullYear()-1,now.getFullYear(),now.getFullYear()+1].map(y=>`<option value="${y}" ${y===now.getFullYear()?'selected':''}>${y}</option>`).join('')}
+      </select>
+      <button class="btn btn-o btn-sm" onclick="P.printPayroll()">🖨 Print Payroll</button>
+      <button class="btn btn-o btn-sm" onclick="P.manageEmployees()">👥 Manage Staff</button>
+    </div>
+
+    <div class="card" id="payrollTable">
+      <div class="empty"><div class="spin" style="margin:0 auto"></div></div>
+    </div>`;
+
+  await P.loadPayroll();
+},
+
+// Kenya PAYE bands 2024
+calcPAYE(gross){
+  // Monthly PAYE
+  let tax=0, remaining=gross;
+  // Band 1: 0 – 24,000 @ 10%
+  const b1=Math.min(remaining,24000); tax+=b1*0.10; remaining-=b1;
+  // Band 2: 24,001 – 32,333 @ 25%
+  const b2=Math.min(remaining,8333); tax+=b2*0.25; remaining-=b2;
+  // Band 3: above 32,333 @ 30%
+  if(remaining>0) tax+=remaining*0.30;
+  // Personal relief: KSh 2,400/month
+  tax=Math.max(0, tax-2400);
+  return Math.round(tax);
+},
+
+// Kenya NHIF 2024
+calcNHIF(gross){
+  if(gross<=5999) return 150;
+  if(gross<=7999) return 300;
+  if(gross<=11999) return 400;
+  if(gross<=14999) return 500;
+  if(gross<=19999) return 600;
+  if(gross<=24999) return 750;
+  if(gross<=29999) return 850;
+  if(gross<=34999) return 900;
+  if(gross<=39999) return 950;
+  if(gross<=44999) return 1000;
+  if(gross<=49999) return 1100;
+  if(gross<=59999) return 1200;
+  if(gross<=69999) return 1300;
+  if(gross<=79999) return 1400;
+  if(gross<=89999) return 1500;
+  if(gross<=99999) return 1600;
+  return 1700;
+},
+
+// Kenya NSSF 2024 (new rates)
+calcNSSF(gross){
+  // Tier I: 6% of gross up to KSh 7,000 (employee portion)
+  const tier1=Math.min(gross,7000)*0.06;
+  // Tier II: 6% of earnings between 7,001 and 36,000
+  const tier2=Math.max(0,Math.min(gross,36000)-7000)*0.06;
+  return Math.round(tier1+tier2);
+},
+
+calcNetSalary(basic, allowances=0){
+  const gross=Number(basic)+Number(allowances);
+  const paye=P.calcPAYE(gross);
+  const nhif=P.calcNHIF(gross);
+  const nssf=P.calcNSSF(gross);
+  const net=gross-paye-nhif-nssf;
+  return {gross,paye,nhif,nssf,net:Math.round(net)};
+},
+
+async loadPayroll(){
+  const month=document.getElementById('prMonth')?.value;
+  const year=document.getElementById('prYear')?.value;
+  if(!month||!year) return;
+  const el=document.getElementById('payrollTable'); if(!el) return;
+  el.innerHTML='<div class="empty"><div class="spin" style="margin:0 auto"></div></div>';
+
+  try{
+    // Load payroll records for this month
+    const [records, employees] = await Promise.all([
+      SB.select('payroll',`month=eq.${month}&year=eq.${year}`,'employee_name.asc').catch(()=>[]),
+      SB.getConfig('payroll_employees').then(v=>v?JSON.parse(v):[]).catch(()=>[])
+    ]);
+    P._payrollRecords=records;
+    P._payrollEmployees=employees;
+
+    // Update stats
+    const totalGross=records.reduce((s,r)=>s+Number(r.gross_salary||0),0);
+    const totalPAYE=records.reduce((s,r)=>s+Number(r.paye||0),0);
+    const totalNet=records.reduce((s,r)=>s+Number(r.net_salary||0),0);
+    const empCount=document.getElementById('prEmpCount'); if(empCount) empCount.textContent=records.length||employees.length||'0';
+    const prGross=document.getElementById('prGross'); if(prGross) prGross.textContent=App.fmt(totalGross);
+    const prPAYE=document.getElementById('prPAYE'); if(prPAYE) prPAYE.textContent=App.fmt(totalPAYE);
+    const prNet=document.getElementById('prNet'); if(prNet) prNet.textContent=App.fmt(totalNet);
+
+    if(!records.length){
+      el.innerHTML=`<div class="empty"><div class="ei">💼</div>
+        <p>No payroll processed for this month yet.</p>
+        ${employees.length?`<p class="sm muted" style="margin-top:6px">${employees.length} employee${employees.length>1?'s':''} on file — click <strong>+ Process Month</strong> to run payroll.</p>`:'<p class="sm muted" style="margin-top:6px">Start by clicking <strong>👥 Manage Staff</strong> to add employees.</p>'}
+        <button class="btn btn-p mt" onclick="P.newPayrollRun()">+ Process This Month</button>
+      </div>`;
+      return;
+    }
+
+    el.innerHTML=`
+      <div class="card-ttl" style="display:flex;justify-content:space-between;align-items:center">
+        <span>Payroll — ${['','January','February','March','April','May','June','July','August','September','October','November','December'][month]} ${year}</span>
+        <span class="bdg ${records.every(r=>r.status==='paid')?'bdg-ok':'bdg-warn'}">${records.every(r=>r.status==='paid')?'All Paid':'Pending'}</span>
+      </div>
+      <div class="tw">
+        <table>
+          <thead>
+            <tr>
+              <th>Employee</th>
+              <th style="text-align:right">Basic Salary</th>
+              <th style="text-align:right">Allowances</th>
+              <th style="text-align:right">Gross</th>
+              <th style="text-align:right">PAYE</th>
+              <th style="text-align:right">NHIF</th>
+              <th style="text-align:right">NSSF</th>
+              <th style="text-align:right">Net Pay</th>
+              <th style="text-align:center">Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${records.map(r=>`<tr>
+              <td><strong>${r.employee_name}</strong></td>
+              <td style="text-align:right">${App.fmt(r.basic_salary)}</td>
+              <td style="text-align:right">${App.fmt(r.allowances||0)}</td>
+              <td style="text-align:right"><strong>${App.fmt(r.gross_salary)}</strong></td>
+              <td style="text-align:right;color:var(--red)">${App.fmt(r.paye)}</td>
+              <td style="text-align:right;color:var(--red)">${App.fmt(r.nhif)}</td>
+              <td style="text-align:right;color:var(--red)">${App.fmt(r.nssf)}</td>
+              <td style="text-align:right;font-weight:700;color:var(--green)">${App.fmt(r.net_salary)}</td>
+              <td style="text-align:center">
+                ${r.status==='paid'
+                  ?'<span class="bdg bdg-ok">Paid</span>'
+                  :`<button class="btn btn-p btn-sm" onclick="P.markPaid('${r.id}')">Mark Paid</button>`}
+              </td>
+              <td style="white-space:nowrap">
+                <button class="btn btn-o btn-sm" onclick="P.printPayslip('${r.id}')">🖨 Payslip</button>
+                <button class="btn btn-d btn-sm" onclick="P.deletePayroll('${r.id}')">Del</button>
+              </td>
+            </tr>`).join('')}
+          </tbody>
+          <tfoot>
+            <tr style="background:var(--bg2);font-weight:700">
+              <td>TOTALS</td>
+              <td style="text-align:right">${App.fmt(records.reduce((s,r)=>s+Number(r.basic_salary||0),0))}</td>
+              <td style="text-align:right">${App.fmt(records.reduce((s,r)=>s+Number(r.allowances||0),0))}</td>
+              <td style="text-align:right">${App.fmt(records.reduce((s,r)=>s+Number(r.gross_salary||0),0))}</td>
+              <td style="text-align:right;color:var(--red)">${App.fmt(records.reduce((s,r)=>s+Number(r.paye||0),0))}</td>
+              <td style="text-align:right;color:var(--red)">${App.fmt(records.reduce((s,r)=>s+Number(r.nhif||0),0))}</td>
+              <td style="text-align:right;color:var(--red)">${App.fmt(records.reduce((s,r)=>s+Number(r.nssf||0),0))}</td>
+              <td style="text-align:right;color:var(--green)">${App.fmt(records.reduce((s,r)=>s+Number(r.net_salary||0),0))}</td>
+              <td colspan="2"></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>`;
+  }catch(e){
+    el.innerHTML=`<div class="empty"><p>Error: ${e.message}</p><p class="sm muted mt">If the payroll table is missing, go to Settings → Run Database Setup.</p></div>`;
+  }
+},
+
+async newPayrollRun(){
+  const employees=await SB.getConfig('payroll_employees').then(v=>v?JSON.parse(v):[]).catch(()=>[]);
+  if(!employees.length){
+    T.warn('No employees set up yet. Click 👥 Manage Staff first.');
+    return P.manageEmployees();
+  }
+  const now=new Date();
+  const months=['','January','February','March','April','May','June','July','August','September','October','November','December'];
+  const month=document.getElementById('prMonth')?.value||String(now.getMonth()+1);
+  const year=document.getElementById('prYear')?.value||String(now.getFullYear());
+  M.open(`Process Payroll — ${months[month]} ${year}`,`
+    <div class="alert a-info sm">Deductions (PAYE, NHIF, NSSF) are calculated automatically using current Kenya rates.</div>
+    <div id="payRunRows">
+      ${employees.map((e,i)=>{
+        const calc=P.calcNetSalary(e.basic_salary,e.allowances||0);
+        return`<div style="border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:10px">
+          <div style="font-weight:700;color:var(--text);margin-bottom:10px">${e.name} <span class="muted sm">· ${e.role||'Staff'}</span></div>
+          <div class="g2">
+            <div class="fg"><label>Basic Salary (KSh)</label>
+              <input type="number" id="pr_basic_${i}" value="${e.basic_salary||0}" min="0"
+                oninput="P._updatePayCalc(${i})" style="font-size:14px"/>
+            </div>
+            <div class="fg"><label>Allowances (KSh)</label>
+              <input type="number" id="pr_allow_${i}" value="${e.allowances||0}" min="0"
+                oninput="P._updatePayCalc(${i})" style="font-size:14px"/>
+            </div>
+          </div>
+          <div id="pr_calc_${i}" style="background:var(--bg2);border-radius:8px;padding:10px;font-size:12px;display:grid;grid-template-columns:repeat(4,1fr);gap:8px;text-align:center">
+            <div><div style="color:var(--text3)">Gross</div><div style="font-weight:700">${App.fmt(calc.gross)}</div></div>
+            <div><div style="color:var(--red)">PAYE</div><div style="font-weight:700;color:var(--red)">-${App.fmt(calc.paye)}</div></div>
+            <div><div style="color:var(--red)">NHIF+NSSF</div><div style="font-weight:700;color:var(--red)">-${App.fmt(calc.nhif+calc.nssf)}</div></div>
+            <div><div style="color:var(--green)">NET PAY</div><div style="font-weight:700;color:var(--green)">${App.fmt(calc.net)}</div></div>
+          </div>
+          <input type="hidden" id="pr_eid_${i}" value="${e.id}"/>
+          <input type="hidden" id="pr_ename_${i}" value="${e.name}"/>
+        </div>`;
+      }).join('')}
+    </div>
+    <input type="hidden" id="pr_month" value="${month}"/>
+    <input type="hidden" id="pr_year" value="${year}"/>`,
+    [{lbl:'Cancel',cls:'btn-o',fn:'M.close()'},{lbl:'Save Payroll ✓',cls:'btn-p',fn:'P.savePayroll()'}]);
+  P._payEmpCount=employees.length;
+},
+
+_updatePayCalc(i){
+  const basic=parseFloat(document.getElementById(`pr_basic_${i}`)?.value)||0;
+  const allow=parseFloat(document.getElementById(`pr_allow_${i}`)?.value)||0;
+  const calc=P.calcNetSalary(basic,allow);
+  const el=document.getElementById(`pr_calc_${i}`);
+  if(el) el.innerHTML=`
+    <div><div style="color:var(--text3)">Gross</div><div style="font-weight:700">${App.fmt(calc.gross)}</div></div>
+    <div><div style="color:var(--red)">PAYE</div><div style="font-weight:700;color:var(--red)">-${App.fmt(calc.paye)}</div></div>
+    <div><div style="color:var(--red)">NHIF+NSSF</div><div style="font-weight:700;color:var(--red)">-${App.fmt(calc.nhif+calc.nssf)}</div></div>
+    <div><div style="color:var(--green)">NET PAY</div><div style="font-weight:700;color:var(--green)">${App.fmt(calc.net)}</div></div>`;
+},
+
+async savePayroll(){
+  const month=document.getElementById('pr_month')?.value;
+  const year=document.getElementById('pr_year')?.value;
+  const count=P._payEmpCount||0;
+  if(!count)return T.err('No employees found.');
+  const btn=document.querySelector('#mFt .btn-p');
+  if(btn){btn.disabled=true;btn.textContent='Saving...';}
+  try{
+    // Check for existing payroll this month
+    const existing=await SB.select('payroll',`month=eq.${month}&year=eq.${year}`).catch(()=>[]);
+    if(existing.length){
+      if(!confirm(`Payroll for this month already exists (${existing.length} records). Overwrite?`)){
+        if(btn){btn.disabled=false;btn.textContent='Save Payroll ✓';}
+        return;
+      }
+      // Delete existing
+      for(const r of existing) await SB.delete('payroll',`id=eq.${r.id}`).catch(()=>{});
+    }
+    // Save each employee
+    for(let i=0;i<count;i++){
+      const eid=document.getElementById(`pr_eid_${i}`)?.value;
+      const ename=document.getElementById(`pr_ename_${i}`)?.value;
+      const basic=parseFloat(document.getElementById(`pr_basic_${i}`)?.value)||0;
+      const allow=parseFloat(document.getElementById(`pr_allow_${i}`)?.value)||0;
+      const calc=P.calcNetSalary(basic,allow);
+      await SB.insert('payroll',{
+        id:SB.genId('PAY'),employee_id:eid,employee_name:ename,
+        month,year:parseInt(year),basic_salary:basic,allowances:allow,
+        gross_salary:calc.gross,paye:calc.paye,nhif:calc.nhif,nssf:calc.nssf,
+        other_deductions:0,net_salary:calc.net,status:'draft',
+        created_by:App.cu.name,created_at:new Date().toISOString()
+      });
+    }
+    M.close();T.ok('Payroll processed successfully!');P.loadPayroll();
+  }catch(e){
+    T.err('Error saving payroll: '+e.message+'. Go to Settings → Run Database Setup if the payroll table is missing.');
+    if(btn){btn.disabled=false;btn.textContent='Save Payroll ✓';}
+  }
+},
+
+async markPaid(id){
+  if(!confirm('Mark this salary as paid?'))return;
+  await SB.update('payroll',`id=eq.${id}`,{status:'paid',paid_at:new Date().toISOString()});
+  T.ok('Marked as paid.');P.loadPayroll();
+},
+
+async deletePayroll(id){
+  if(!confirm('Delete this payroll record?'))return;
+  await SB.delete('payroll',`id=eq.${id}`);T.ok('Deleted.');P.loadPayroll();
+},
+
+manageEmployees(){
+  const employees=P._payrollEmployees||[];
+  M.open('👥 Manage Payroll Employees',`
+    <p class="muted sm mb">These are the employees who appear in payroll. This is separate from app login users — add all staff who receive a salary here.</p>
+    <div id="empList" style="margin-bottom:14px">
+      ${employees.length?employees.map((e,i)=>`
+        <div style="display:flex;align-items:center;gap:8px;padding:9px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px">
+          <div style="flex:1"><div style="font-weight:600">${e.name}</div><div class="sm muted">${e.role||'Staff'} · KSh ${Number(e.basic_salary||0).toLocaleString()}/mo basic</div></div>
+          <button class="btn btn-o btn-sm" onclick="P._editEmp(${i})">Edit</button>
+          <button class="btn btn-d btn-sm" onclick="P._delEmp(${i})">×</button>
+        </div>`).join(''):'<p class="muted sm">No employees yet.</p>'}
+    </div>
+    <div style="border-top:1px solid var(--border);padding-top:14px">
+      <div class="bold sm mb">Add New Employee</div>
+      <div class="g2">
+        <div class="fg"><label>Full Name *</label><input type="text" id="empName" placeholder="e.g. Mary Wanjiku"/></div>
+        <div class="fg"><label>Job Title / Role</label><input type="text" id="empRole" placeholder="e.g. Sales Assistant"/></div>
+      </div>
+      <div class="g2">
+        <div class="fg"><label>Basic Salary (KSh/month)</label><input type="number" id="empBasic" placeholder="0" min="0" oninput="P._previewDeductions()"/></div>
+        <div class="fg"><label>Allowances (KSh/month)</label><input type="number" id="empAllow" placeholder="0" min="0" oninput="P._previewDeductions()"/></div>
+      </div>
+      <div class="fg"><label>National ID / KRA PIN</label><input type="text" id="empId" placeholder="e.g. 12345678 / A000000000Z"/></div>
+      <div id="empDeductPreview" style="background:var(--green-pale);border-radius:8px;padding:10px;font-size:12px;display:none;margin-bottom:10px"></div>
+      <button class="btn btn-p" onclick="P._addEmp()">+ Add Employee</button>
+    </div>`,
+    [{lbl:'Done',cls:'btn-p',fn:'P._saveEmpList()'}]);
+},
+
+_previewDeductions(){
+  const basic=parseFloat(document.getElementById('empBasic')?.value)||0;
+  const allow=parseFloat(document.getElementById('empAllow')?.value)||0;
+  const el=document.getElementById('empDeductPreview');
+  if(!el||!basic)return;
+  const calc=P.calcNetSalary(basic,allow);
+  el.style.display='block';
+  el.innerHTML=`<strong>Estimated monthly deductions:</strong> &nbsp; Gross: ${App.fmt(calc.gross)} &nbsp;|&nbsp; PAYE: <span style="color:var(--red)">${App.fmt(calc.paye)}</span> &nbsp;|&nbsp; NHIF: <span style="color:var(--red)">${App.fmt(calc.nhif)}</span> &nbsp;|&nbsp; NSSF: <span style="color:var(--red)">${App.fmt(calc.nssf)}</span> &nbsp;|&nbsp; <strong>NET: <span style="color:var(--green)">${App.fmt(calc.net)}</span></strong>`;
+},
+
+_addEmp(){
+  const name=document.getElementById('empName')?.value.trim();
+  if(!name)return T.err('Employee name is required.');
+  const emp={
+    id:'EMP_'+Date.now(),
+    name,
+    role:document.getElementById('empRole')?.value.trim()||'Staff',
+    basic_salary:parseFloat(document.getElementById('empBasic')?.value)||0,
+    allowances:parseFloat(document.getElementById('empAllow')?.value)||0,
+    national_id:document.getElementById('empId')?.value.trim()||''
+  };
+  if(!P._payrollEmployees) P._payrollEmployees=[];
+  P._payrollEmployees.push(emp);
+  // Refresh the list
+  document.getElementById('empName').value='';
+  document.getElementById('empRole').value='';
+  document.getElementById('empBasic').value='';
+  document.getElementById('empAllow').value='';
+  document.getElementById('empId').value='';
+  document.getElementById('empDeductPreview').style.display='none';
+  const list=document.getElementById('empList');
+  if(list) list.innerHTML=P._payrollEmployees.map((e,i)=>`
+    <div style="display:flex;align-items:center;gap:8px;padding:9px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px">
+      <div style="flex:1"><div style="font-weight:600">${e.name}</div><div class="sm muted">${e.role} · KSh ${Number(e.basic_salary||0).toLocaleString()}/mo basic</div></div>
+      <button class="btn btn-o btn-sm" onclick="P._editEmp(${i})">Edit</button>
+      <button class="btn btn-d btn-sm" onclick="P._delEmp(${i})">×</button>
+    </div>`).join('');
+  T.ok(emp.name+' added to payroll list.');
+},
+
+_editEmp(i){
+  const e=P._payrollEmployees[i];if(!e)return;
+  document.getElementById('empName').value=e.name;
+  document.getElementById('empRole').value=e.role||'';
+  document.getElementById('empBasic').value=e.basic_salary||'';
+  document.getElementById('empAllow').value=e.allowances||'';
+  document.getElementById('empId').value=e.national_id||'';
+  P._payrollEmployees.splice(i,1);
+  const list=document.getElementById('empList');
+  if(list) list.innerHTML=P._payrollEmployees.map((e,i)=>`
+    <div style="display:flex;align-items:center;gap:8px;padding:9px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px">
+      <div style="flex:1"><div style="font-weight:600">${e.name}</div><div class="sm muted">${e.role} · KSh ${Number(e.basic_salary||0).toLocaleString()}/mo</div></div>
+      <button class="btn btn-o btn-sm" onclick="P._editEmp(${i})">Edit</button>
+      <button class="btn btn-d btn-sm" onclick="P._delEmp(${i})">×</button>
+    </div>`).join('')||'<p class="muted sm">No employees.</p>';
+},
+
+_delEmp(i){
+  const e=P._payrollEmployees[i];
+  if(!e||!confirm(`Remove ${e.name} from payroll?`))return;
+  P._payrollEmployees.splice(i,1);
+  const list=document.getElementById('empList');
+  if(list) list.innerHTML=P._payrollEmployees.map((e,i)=>`
+    <div style="display:flex;align-items:center;gap:8px;padding:9px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px">
+      <div style="flex:1"><div style="font-weight:600">${e.name}</div><div class="sm muted">${e.role} · KSh ${Number(e.basic_salary||0).toLocaleString()}/mo</div></div>
+      <button class="btn btn-o btn-sm" onclick="P._editEmp(${i})">Edit</button>
+      <button class="btn btn-d btn-sm" onclick="P._delEmp(${i})">×</button>
+    </div>`).join('')||'<p class="muted sm">No employees.</p>';
+},
+
+async _saveEmpList(){
+  await SB.setConfig('payroll_employees',JSON.stringify(P._payrollEmployees||[]));
+  M.close();T.ok('Employee list saved!');P.payroll();
+},
+
+printPayslip(id){
+  const record=(P._payrollRecords||[]).find(r=>r.id===id);
+  if(!record)return T.err('Record not found.');
+  const biz=App.cfg?.business||{};
+  const months=['','January','February','March','April','May','June','July','August','September','October','November','December'];
+  const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Payslip</title><style>
+  *{box-sizing:border-box;margin:0;padding:0}body{font-family:'Segoe UI',Arial,sans-serif;background:#fff;color:#1c1a16;padding:40px;max-width:620px;margin:0 auto}
+  .hd{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:30px;padding-bottom:16px;border-bottom:3px solid #1b4332}
+  .bn{font-size:22px;font-weight:700;color:#1b4332}.bd{font-size:11px;color:#5c584f;margin-top:4px;line-height:1.8}
+  .il{text-align:right}.il h2{font-size:20px;font-weight:700;color:#1b4332;text-transform:uppercase;letter-spacing:.06em}
+  .il p{font-size:12px;color:#5c584f;margin-top:3px}
+  .emp-box{background:#f4f1ec;border-radius:8px;padding:14px 18px;margin-bottom:22px;display:flex;justify-content:space-between}
+  .emp-name{font-size:16px;font-weight:700;color:#1b4332}.emp-role{font-size:12px;color:#5c584f;margin-top:2px}
+  table{width:100%;border-collapse:collapse;margin-bottom:18px}
+  thead tr{background:#1b4332;color:#fff}th{padding:9px 14px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.06em}
+  td{padding:10px 14px;border-bottom:1px solid #ebe7de;font-size:13px}tr:last-child td{border-bottom:none}
+  .deduction{color:#b91c1c;font-weight:500}.net-row{background:#e8f0eb;font-weight:700}
+  .net-row td{border:none;padding:12px 14px;font-size:14px;color:#1b4332}
+  .footer{margin-top:32px;padding-top:14px;border-top:1px solid #ebe7de;display:flex;justify-content:space-between;font-size:11px;color:#8c8880}
+  @media print{body{padding:16px}@page{margin:1cm;size:A4}}
+  </style></head><body>
+  <div class="hd">
+    <div><div class="bn">${biz.name||'Smart Books'}</div><div class="bd">${biz.address?biz.address+'<br>':''}${biz.phone?'Tel: '+biz.phone+'<br>':''}${biz.kra?'KRA PIN: '+biz.kra:''}</div></div>
+    <div class="il"><h2>Payslip</h2><p>${months[record.month]||record.month} ${record.year}</p><p>Generated: ${new Date().toLocaleDateString('en-KE',{day:'numeric',month:'long',year:'numeric'})}</p></div>
+  </div>
+  <div class="emp-box">
+    <div><div class="emp-name">${record.employee_name}</div><div class="emp-role">Employee</div></div>
+    <div style="text-align:right"><div class="emp-role">Period</div><div class="emp-name" style="font-size:14px">${months[record.month]||record.month} ${record.year}</div></div>
+  </div>
+  <table>
+    <thead><tr><th>Earnings</th><th style="text-align:right">Amount (KSh)</th></tr></thead>
+    <tbody>
+      <tr><td>Basic Salary</td><td style="text-align:right">${App.fmt(record.basic_salary)}</td></tr>
+      ${Number(record.allowances)>0?`<tr><td>Allowances</td><td style="text-align:right">${App.fmt(record.allowances)}</td></tr>`:''}
+      <tr style="background:#f4f1ec;font-weight:600"><td>Gross Salary</td><td style="text-align:right">${App.fmt(record.gross_salary)}</td></tr>
+    </tbody>
+  </table>
+  <table>
+    <thead><tr><th>Statutory Deductions</th><th style="text-align:right">Amount (KSh)</th></tr></thead>
+    <tbody>
+      <tr><td>PAYE (Income Tax — KRA)</td><td class="deduction" style="text-align:right">( ${App.fmt(record.paye)} )</td></tr>
+      <tr><td>NHIF (Health Insurance)</td><td class="deduction" style="text-align:right">( ${App.fmt(record.nhif)} )</td></tr>
+      <tr><td>NSSF (Social Security)</td><td class="deduction" style="text-align:right">( ${App.fmt(record.nssf)} )</td></tr>
+      ${Number(record.other_deductions)>0?`<tr><td>Other Deductions</td><td class="deduction" style="text-align:right">( ${App.fmt(record.other_deductions)} )</td></tr>`:''}
+    </tbody>
+  </table>
+  <table><tbody><tr class="net-row"><td>NET PAY</td><td style="text-align:right;font-size:18px;color:#1b4332">${App.fmt(record.net_salary)}</td></tr></tbody></table>
+  <div class="footer">
+    <span>${biz.name||'Smart Books'} — Confidential Payroll Record</span>
+    <span>Status: ${record.status==='paid'?'PAID ✓':'PENDING'}</span>
+  </div>
+  <div style="margin-top:40px;display:flex;justify-content:space-between;font-size:12px;color:#5c584f">
+    <div><div style="border-top:1px solid #1b4332;margin-top:30px;padding-top:4px;min-width:160px">Employee Signature</div></div>
+    <div><div style="border-top:1px solid #1b4332;margin-top:30px;padding-top:4px;min-width:160px">Employer Signature & Stamp</div></div>
+  </div>
+  <script>window.onload=()=>window.print()<\/script></body></html>`;
+  const w=window.open('','_blank','width=700,height:900');
+  w.document.write(html);w.document.close();
+},
+
+printPayroll(){
+  window.print();
+},
+
 // ─── SETTINGS ───
 async settings(){
   const mc=document.getElementById('mc'),biz=App.cfg?.business||{};
   mc.innerHTML=`
     <div class="pg-hd"><div><h2>Settings</h2><p>Business & account configuration</p></div></div>
-    <div class="g2">
+
+    <div class="g2" style="margin-bottom:14px">
       <div class="card">
         <div class="card-ttl">Business Information</div>
         <div class="fg"><label>Business Name</label><input type="text" id="sbn" value="${biz.name||''}"/></div>
         <div class="fg"><label>Address</label><input type="text" id="sba" value="${biz.address||''}"/></div>
         <div class="fg"><label>Phone</label><input type="text" id="sbp" value="${biz.phone||''}"/></div>
-        <div class="fg"><label>Currency</label><input type="text" id="sbc" value="${biz.currency||'KSh'}"/></div>
         <div class="fg"><label>Email Address</label><input type="text" id="sbe" value="${biz.email||''}" placeholder="e.g. info@yourbusiness.com"/></div>
-        <div class="fg"><label>KRA PIN</label><input type="text" id="sbk" value="${biz.kra||''}"/></div>
+        <div class="fg"><label>Currency Symbol</label><input type="text" id="sbc" value="${biz.currency||'KSh'}" placeholder="KSh / USD / £"/></div>
+        <div class="fg"><label>KRA PIN</label><input type="text" id="sbk" value="${biz.kra||''}" placeholder="P051234567X"/></div>
         <button class="btn btn-p" onclick="P.saveBiz()">Save Business Info</button>
       </div>
       <div>
@@ -2382,22 +2922,138 @@ async settings(){
         </div>
         <div class="card mb">
           <div class="card-ttl">🔐 Admin Password</div>
-          <p class="muted sm" style="margin-bottom:10px">The Admin password is used to: link new devices, and reset forgotten passwords. Change it carefully.</p>
+          <p class="muted sm mb">Used to link new devices and reset forgotten passwords.</p>
           <div class="fg"><label>Current Admin Password</label><input type="password" id="cadminOld"/></div>
           <div class="fg"><label>New Admin Password</label><input type="password" id="cadminNew" placeholder="Min 4 characters"/></div>
           <div class="fg"><label>Confirm New</label><input type="password" id="cadminNewC"/></div>
           <button class="btn btn-p" onclick="P.changeAdminPass()">Change Admin Password</button>
         </div>
+        <div class="card mt">
+          <div class="card-ttl">📱 Mpesa Payment Settings</div>
+          <p class="muted sm mb">Configure how staff collect Mpesa payments. Fill in whichever method you use.</p>
+          <div class="g2">
+            <div class="fg"><label>Till Number <span class="lh">(Buy Goods)</span></label><input type="text" id="mpTill" value="${biz.mpesa_till||''}" placeholder="e.g. 5289176"/></div>
+            <div class="fg"><label>Paybill Number</label><input type="text" id="mpPaybill" value="${biz.mpesa_paybill||''}" placeholder="e.g. 247247"/></div>
+          </div>
+          <div class="g2">
+            <div class="fg"><label>Pochi la Biashara</label><input type="text" id="mpPochi" value="${biz.mpesa_pochi||''}" placeholder="e.g. 0712 345 678"/></div>
+            <div class="fg"><label>Send Money Number</label><input type="text" id="mpPhone" value="${biz.mpesa_phone||''}" placeholder="e.g. 0712 345 678"/></div>
+          </div>
+          <div class="fg"><label>Paybill Account Name</label><input type="text" id="mpAccount" value="${biz.mpesa_account||''}" placeholder="e.g. Your business name"/></div>
+          <div class="divider"></div>
+          <p class="sm bold" style="color:var(--green);margin-bottom:6px">STK Push — Daraja API (Till/Paybill only)</p>
+          <div class="alert a-info sm" style="font-size:11px;margin-bottom:10px">Register at <a href="https://developer.safaricom.co.ke" target="_blank">developer.safaricom.co.ke</a> → Create App → get Consumer Key, Secret and Passkey.</div>
+          <div class="g2">
+            <div class="fg"><label>Consumer Key</label><input type="text" id="mpDarajaKey" value="${biz.daraja_key||''}" placeholder="From Daraja portal"/></div>
+            <div class="fg"><label>Consumer Secret</label><input type="password" id="mpDarajaSecret" value="${biz.daraja_secret||''}" placeholder="From Daraja portal"/></div>
+          </div>
+          <div class="g2">
+            <div class="fg"><label>Lipa Na Mpesa Passkey</label><input type="password" id="mpDarajaPass" value="${biz.daraja_password||''}" placeholder="From Daraja portal"/></div>
+            <div class="fg"><label>Environment</label>
+              <select id="mpDarajaEnv">
+                <option value="https://sandbox.safaricom.co.ke" ${!(biz.daraja_base||'').includes('api.safaricom')?'selected':''}>Sandbox (Testing)</option>
+                <option value="https://api.safaricom.co.ke" ${(biz.daraja_base||'').includes('api.safaricom')?'selected':''}>Live (Production)</option>
+              </select>
+            </div>
+          </div>
+          <button class="btn btn-p" onclick="P.saveMpesa()">Save Mpesa Settings</button>
+        </div>
+
+        <div class="card mt">
+          <div class="card-ttl">📧 Email Receipts (EmailJS)</div>
+          <p class="muted sm mb">Send email receipts automatically. Free up to 200/month at <a href="https://emailjs.com" target="_blank">emailjs.com</a> — no server needed.</p>
+          <div class="fg"><label>Public Key</label><input type="text" id="ejsKey" value="${biz.emailjs_key||''}" placeholder="From EmailJS → Account → API Keys"/></div>
+          <div class="fg"><label>Service ID</label><input type="text" id="ejsService" value="${biz.emailjs_service||''}" placeholder="e.g. service_abc123"/></div>
+          <div class="fg"><label>Template ID</label><input type="text" id="ejsTemplate" value="${biz.emailjs_template||''}" placeholder="e.g. template_xyz456"/></div>
+          <small style="margin-bottom:10px;display:block">Template variables: <code>to_email</code>, <code>to_name</code>, <code>from_name</code>, <code>receipt_id</code>, <code>product</code>, <code>quantity</code>, <code>total</code>, <code>payment_method</code>, <code>sale_date</code></small>
+          <button class="btn btn-p" onclick="P.saveEmailJS()">Save EmailJS Settings</button>
+        </div>
+
+        <div class="card mb">
+          <div class="card-ttl">🛠 Database Setup</div>
+          <p class="muted sm" style="margin-bottom:10px">If you see errors about missing tables (suppliers, payroll, etc.), click this button. It creates any missing tables automatically.</p>
+          <div id="dbSetupMsg"></div>
+          <button class="btn btn-p" onclick="P.runDbSetup()">Run Database Setup</button>
+        </div>
         <div class="card">
           <div class="card-ttl">App Info</div>
-          <div class="fb" style="padding:5px 0;border-bottom:1px solid var(--border)"><span class="muted">Version</span><span>Smart Books v4.0</span></div>
+          <div class="fb" style="padding:5px 0;border-bottom:1px solid var(--border)"><span class="muted">Version</span><span>Smart Books v5.0</span></div>
           <div class="fb" style="padding:5px 0;border-bottom:1px solid var(--border)"><span class="muted">Database</span><span>Supabase (PostgreSQL)</span></div>
           <div class="fb" style="padding:5px 0;border-bottom:1px solid var(--border)"><span class="muted">AI</span><span>Groq — Llama 3 (free)</span></div>
-          <div class="fb" style="padding:5px 0;border-bottom:1px solid var(--border)"><span class="muted">This Device</span><span class="mono">${Auth.deviceToken()}</span></div>
+          <div class="fb" style="padding:5px 0;border-bottom:1px solid var(--border)"><span class="muted">This Device</span><span class="mono" style="font-size:10px">${Auth.deviceToken()}</span></div>
           <div id="devList" class="mt"></div>
           <button class="btn btn-o btn-sm mt" onclick="P.loadDevices()">View Linked Devices</button>
         </div>
       </div>
+    </div>
+
+    <div class="card mt">
+      <div class="card-ttl">📱 Mpesa Payment Settings</div>
+      <p class="muted sm mb">Fill in whichever Mpesa type you use. These show on the payment screen during a sale. Leave unused ones blank.</p>
+      <div class="g2">
+        <div class="fg"><label>Till Number <span class="lh">(Buy Goods)</span></label>
+          <input type="text" id="mpTill" value="${biz.mpesa_till||''}" placeholder="e.g. 5289176"/>
+        </div>
+        <div class="fg"><label>Paybill Number</label>
+          <input type="text" id="mpPaybill" value="${biz.mpesa_paybill||''}" placeholder="e.g. 247247"/>
+        </div>
+        <div class="fg"><label>Pochi la Biashara</label>
+          <input type="text" id="mpPochi" value="${biz.mpesa_pochi||''}" placeholder="e.g. 0712 345 678"/>
+        </div>
+        <div class="fg"><label>Send Money (Personal No.)</label>
+          <input type="text" id="mpPhone" value="${biz.mpesa_phone||''}" placeholder="e.g. 0712 345 678"/>
+        </div>
+      </div>
+      <div class="fg"><label>Paybill Account Name <span class="lh">(if using Paybill)</span></label>
+        <input type="text" id="mpAccount" value="${biz.mpesa_account||''}" placeholder="e.g. Your name or store name"/>
+      </div>
+      <button class="btn btn-p" onclick="P.saveMpesa()">Save Mpesa Details</button>
+
+      <div class="divider"></div>
+      <div style="font-size:13px;font-weight:600;color:var(--green);margin-bottom:8px">STK Push — Automatic Payment Prompt (Optional)</div>
+      <div class="alert a-info sm mb">STK Push sends a Mpesa payment request directly to the customer's phone. Requires Safaricom Daraja API credentials. Only works with Till or Paybill — not Pochi or Send Money.</div>
+      <div class="g2">
+        <div class="fg"><label>Daraja Consumer Key</label>
+          <input type="text" id="mpDarajaKey" value="${biz.daraja_key||''}" placeholder="From Safaricom Daraja portal"/>
+          <small>Get from <a href="https://developer.safaricom.co.ke" target="_blank">developer.safaricom.co.ke</a> → Apps → Your App</small>
+        </div>
+        <div class="fg"><label>Daraja Consumer Secret</label>
+          <input type="password" id="mpDarajaSecret" value="${biz.daraja_secret||''}" placeholder="Consumer secret key"/>
+        </div>
+      </div>
+      <div class="fg"><label>Lipa Na Mpesa Passkey</label>
+        <input type="password" id="mpDarajaPass" value="${biz.daraja_password||''}" placeholder="Online passkey from Daraja dashboard"/>
+        <small>Found in Daraja portal → Go Live → Lipa Na Mpesa → Passkey</small>
+      </div>
+      <div class="fg"><label>Environment</label>
+        <select id="mpDarajaEnv">
+          <option value="https://sandbox.safaricom.co.ke" ${!(biz.daraja_base||'').includes('api.safaricom')?'selected':''}>Sandbox (Testing — use this first)</option>
+          <option value="https://api.safaricom.co.ke" ${(biz.daraja_base||'').includes('api.safaricom')?'selected':''}>Live / Production</option>
+        </select>
+      </div>
+      <button class="btn btn-p" onclick="P.saveMpesa()">Save STK Push Settings</button>
+    </div>
+
+    <div class="card mt">
+      <div class="card-ttl">📧 Email Receipts — EmailJS (Optional)</div>
+      <p class="muted sm mb">Send professional email receipts automatically after each sale. Free for up to 200 emails/month.</p>
+      <div class="alert a-info sm mb" style="font-size:12px">
+        Setup: Go to <a href="https://emailjs.com" target="_blank">emailjs.com</a> → Create account → Add Email Service → Create Template → copy IDs below.<br>
+        Template variables: <code>to_email</code> <code>to_name</code> <code>from_name</code> <code>receipt_id</code> <code>product</code> <code>quantity</code> <code>total</code> <code>payment_method</code> <code>sale_date</code> <code>served_by</code>
+      </div>
+      <div class="g2">
+        <div class="fg"><label>EmailJS Public Key</label>
+          <input type="text" id="ejsKey" value="${biz.emailjs_key||''}" placeholder="e.g. user_abc123xyz"/>
+          <small>Account → API Keys → Public Key</small>
+        </div>
+        <div class="fg"><label>Service ID</label>
+          <input type="text" id="ejsService" value="${biz.emailjs_service||''}" placeholder="e.g. service_abc123"/>
+        </div>
+      </div>
+      <div class="fg"><label>Template ID</label>
+        <input type="text" id="ejsTemplate" value="${biz.emailjs_template||''}" placeholder="e.g. template_xyz456"/>
+      </div>
+      <button class="btn btn-p" onclick="P.saveEmailJS()">Save EmailJS Settings</button>
     </div>`;
 },
 
@@ -2453,6 +3109,39 @@ async changeAdminPass(){
   document.getElementById('cadminOld').value='';document.getElementById('cadminNew').value='';document.getElementById('cadminNewC').value='';
 },
 
+async runDbSetup(){
+  const el=document.getElementById('dbSetupMsg');
+  if(el){el.className='alert a-info';el.textContent='Running setup...';}
+  const sbCfg=CFG.get();
+  const tables=[
+    `create table if not exists suppliers(id text primary key, name text, contact_person text, phone text, email text, address text, notes text, active boolean default true, created_at timestamptz default now())`,
+    `create table if not exists payroll(id text primary key, employee_id text, employee_name text, month text, year integer, basic_salary numeric default 0, allowances numeric default 0, gross_salary numeric default 0, paye numeric default 0, nhif numeric default 0, nssf numeric default 0, other_deductions numeric default 0, net_salary numeric default 0, status text default 'draft', paid_at timestamptz, notes text, created_by text, created_at timestamptz default now())`,
+    `alter table sales add column if not exists invoice_number text`,
+  ];
+  let ok=0,fail=0;
+  for(const sql of tables){
+    try{
+      await fetch(`${sbCfg.url}/rest/v1/`,{headers:{'apikey':sbCfg.key}});
+      // Try via pg_dump function if available
+      const r=await fetch(`${sbCfg.url}/rest/v1/rpc/exec_sql`,{method:'POST',headers:{'Content-Type':'application/json','apikey':sbCfg.key,'Authorization':'Bearer '+sbCfg.key},body:JSON.stringify({sql})});
+      if(r.ok)ok++;else fail++;
+    }catch(e){fail++;}
+  }
+  if(el){
+    if(fail===0){
+      el.className='alert a-ok';
+      el.textContent='✓ All tables created/verified successfully! Reload the page.';
+    } else {
+      el.className='alert a-warn';
+      el.innerHTML=`⚠ ${ok} succeeded, ${fail} need manual SQL.<br><small>Copy the SQL from below and run it in your Supabase SQL Editor:</small><br>
+      <textarea style="width:100%;margin-top:8px;font-size:11px;font-family:monospace;height:120px;padding:6px" readonly>
+create table if not exists suppliers(id text primary key, name text, contact_person text, phone text, email text, address text, notes text, active boolean default true, created_at timestamptz default now());
+create table if not exists payroll(id text primary key, employee_id text, employee_name text, month text, year integer, basic_salary numeric default 0, allowances numeric default 0, gross_salary numeric default 0, paye numeric default 0, nhif numeric default 0, nssf numeric default 0, other_deductions numeric default 0, net_salary numeric default 0, status text default 'draft', paid_at timestamptz, notes text, created_by text, created_at timestamptz default now());
+alter table sales add column if not exists invoice_number text;</textarea>`;
+    }
+  }
+},
+
 async loadDevices(){
   const el=document.getElementById('devList');el.innerHTML='<p class="muted sm">Loading...</p>';
   try{
@@ -2468,7 +3157,7 @@ printInv(saleId){
   const doP=sale=>{
     const b=App.cfg?.business||{};
     const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Invoice</title><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Segoe UI',Arial,sans-serif;background:#fff;color:#1c1a16;padding:40px;max-width:660px;margin:0 auto}.hd{display:flex;justify-content:space-between;margin-bottom:34px;padding-bottom:16px;border-bottom:3px solid #1b4332}.bn{font-size:24px;font-weight:700;color:#1b4332}.bd{font-size:11px;color:#5c584f;margin-top:5px;line-height:1.8}.il h2{font-size:26px;color:#b5650a;letter-spacing:2px;text-transform:uppercase;text-align:right}.il p{font-size:12px;color:#5c584f;text-align:right;margin-top:3px}.sec{margin-bottom:22px}.sl{font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:#8c8880;margin-bottom:6px;font-weight:600}.cb{background:#f4f1ec;border-radius:7px;padding:12px 15px;font-size:13px}table{width:100%;border-collapse:collapse}thead tr{background:#1b4332;color:#fff}th{padding:9px 12px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.06em}td{padding:10px 12px;border-bottom:1px solid #ebe7de;font-size:13px}tr:last-child td{border-bottom:none}.tot{float:right;width:230px;margin-top:14px}.tot td{padding:5px 0;border:none;font-size:13px}.tf{font-size:17px;font-weight:700;color:#1b4332;border-top:2px solid #1b4332;padding-top:7px!important}.pb{display:inline-block;background:#e8f0eb;color:#1b4332;padding:3px 11px;border-radius:99px;font-size:11px;font-weight:600}.ft{margin-top:42px;padding-top:14px;border-top:1px solid #ebe7de;text-align:center;font-size:11px;color:#8c8880}.cf::after{content:'';display:table;clear:both}@media print{body{padding:16px}@page{margin:1cm;size:A4}}</style></head><body>
-    <div class="hd"><div><div class="bn">${b.name||'Business'}</div><div class="bd">${b.address?b.address+'<br>':''}${b.phone?'Tel: '+b.phone+'<br>':''}${b.kra?'KRA: '+b.kra:''}</div></div><div class="il"><h2>Invoice</h2><p>${String(sale.id).slice(-10)}</p><p>${new Date(sale.created_at).toLocaleDateString('en-KE',{day:'numeric',month:'long',year:'numeric'})}</p><p>${new Date(sale.created_at).toLocaleTimeString('en-KE',{hour:'2-digit',minute:'2-digit'})}</p></div></div>
+    <div class="hd"><div><div class="bn">${b.name||'Business'}</div><div class="bd">${b.address?b.address+'<br>':''}${b.phone?'Tel: '+b.phone+'<br>':''}${b.kra?'KRA: '+b.kra:''}</div></div><div class="il"><h2>Invoice</h2><p>${sale.invoice_number||String(sale.id).slice(-8).toUpperCase()}</p><p>${new Date(sale.created_at).toLocaleDateString('en-KE',{day:'numeric',month:'long',year:'numeric'})}</p><p>${new Date(sale.created_at).toLocaleTimeString('en-KE',{hour:'2-digit',minute:'2-digit'})}</p></div></div>
     <div class="sec"><div class="sl">Bill To</div><div class="cb"><strong>${sale.customer||'Walk-in Customer'}</strong></div></div>
     <table><thead><tr><th>Description</th><th style="text-align:center">Qty</th><th style="text-align:right">Unit Price</th><th style="text-align:right">Amount</th></tr></thead><tbody><tr><td>${sale.product_name}${sale.notes?'<br><small style="color:#8c8880">'+sale.notes+'</small>':''}</td><td style="text-align:center">${sale.quantity}</td><td style="text-align:right">${b.currency||'KSh'} ${Number(sale.unit_price).toFixed(2)}</td><td style="text-align:right"><strong>${b.currency||'KSh'} ${Number(sale.total).toFixed(2)}</strong></td></tr></tbody></table>
     <div class="cf"><table class="tot"><tr><td>Subtotal</td><td style="text-align:right">${b.currency||'KSh'} ${Number(sale.total).toFixed(2)}</td></tr><tr><td colspan="2" style="border-top:1px solid #ebe7de;padding:4px 0!important"></td></tr><tr><td class="tf">TOTAL</td><td class="tf" style="text-align:right">${b.currency||'KSh'} ${Number(sale.total).toFixed(2)}</td></tr></table></div>
