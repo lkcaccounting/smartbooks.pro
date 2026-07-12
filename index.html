@@ -2928,47 +2928,6 @@ async settings(){
           <div class="fg"><label>Confirm New</label><input type="password" id="cadminNewC"/></div>
           <button class="btn btn-p" onclick="P.changeAdminPass()">Change Admin Password</button>
         </div>
-        <div class="card mt">
-          <div class="card-ttl">📱 Mpesa Payment Settings</div>
-          <p class="muted sm mb">Configure how staff collect Mpesa payments. Fill in whichever method you use.</p>
-          <div class="g2">
-            <div class="fg"><label>Till Number <span class="lh">(Buy Goods)</span></label><input type="text" id="mpTill" value="${biz.mpesa_till||''}" placeholder="e.g. 5289176"/></div>
-            <div class="fg"><label>Paybill Number</label><input type="text" id="mpPaybill" value="${biz.mpesa_paybill||''}" placeholder="e.g. 247247"/></div>
-          </div>
-          <div class="g2">
-            <div class="fg"><label>Pochi la Biashara</label><input type="text" id="mpPochi" value="${biz.mpesa_pochi||''}" placeholder="e.g. 0712 345 678"/></div>
-            <div class="fg"><label>Send Money Number</label><input type="text" id="mpPhone" value="${biz.mpesa_phone||''}" placeholder="e.g. 0712 345 678"/></div>
-          </div>
-          <div class="fg"><label>Paybill Account Name</label><input type="text" id="mpAccount" value="${biz.mpesa_account||''}" placeholder="e.g. Your business name"/></div>
-          <div class="divider"></div>
-          <p class="sm bold" style="color:var(--green);margin-bottom:6px">STK Push — Daraja API (Till/Paybill only)</p>
-          <div class="alert a-info sm" style="font-size:11px;margin-bottom:10px">Register at <a href="https://developer.safaricom.co.ke" target="_blank">developer.safaricom.co.ke</a> → Create App → get Consumer Key, Secret and Passkey.</div>
-          <div class="g2">
-            <div class="fg"><label>Consumer Key</label><input type="text" id="mpDarajaKey" value="${biz.daraja_key||''}" placeholder="From Daraja portal"/></div>
-            <div class="fg"><label>Consumer Secret</label><input type="password" id="mpDarajaSecret" value="${biz.daraja_secret||''}" placeholder="From Daraja portal"/></div>
-          </div>
-          <div class="g2">
-            <div class="fg"><label>Lipa Na Mpesa Passkey</label><input type="password" id="mpDarajaPass" value="${biz.daraja_password||''}" placeholder="From Daraja portal"/></div>
-            <div class="fg"><label>Environment</label>
-              <select id="mpDarajaEnv">
-                <option value="https://sandbox.safaricom.co.ke" ${!(biz.daraja_base||'').includes('api.safaricom')?'selected':''}>Sandbox (Testing)</option>
-                <option value="https://api.safaricom.co.ke" ${(biz.daraja_base||'').includes('api.safaricom')?'selected':''}>Live (Production)</option>
-              </select>
-            </div>
-          </div>
-          <button class="btn btn-p" onclick="P.saveMpesa()">Save Mpesa Settings</button>
-        </div>
-
-        <div class="card mt">
-          <div class="card-ttl">📧 Email Receipts (EmailJS)</div>
-          <p class="muted sm mb">Send email receipts automatically. Free up to 200/month at <a href="https://emailjs.com" target="_blank">emailjs.com</a> — no server needed.</p>
-          <div class="fg"><label>Public Key</label><input type="text" id="ejsKey" value="${biz.emailjs_key||''}" placeholder="From EmailJS → Account → API Keys"/></div>
-          <div class="fg"><label>Service ID</label><input type="text" id="ejsService" value="${biz.emailjs_service||''}" placeholder="e.g. service_abc123"/></div>
-          <div class="fg"><label>Template ID</label><input type="text" id="ejsTemplate" value="${biz.emailjs_template||''}" placeholder="e.g. template_xyz456"/></div>
-          <small style="margin-bottom:10px;display:block">Template variables: <code>to_email</code>, <code>to_name</code>, <code>from_name</code>, <code>receipt_id</code>, <code>product</code>, <code>quantity</code>, <code>total</code>, <code>payment_method</code>, <code>sale_date</code></small>
-          <button class="btn btn-p" onclick="P.saveEmailJS()">Save EmailJS Settings</button>
-        </div>
-
         <div class="card mb">
           <div class="card-ttl">🛠 Database Setup</div>
           <p class="muted sm" style="margin-bottom:10px">If you see errors about missing tables (suppliers, payroll, etc.), click this button. It creates any missing tables automatically.</p>
@@ -3054,6 +3013,31 @@ async settings(){
         <input type="text" id="ejsTemplate" value="${biz.emailjs_template||''}" placeholder="e.g. template_xyz456"/>
       </div>
       <button class="btn btn-p" onclick="P.saveEmailJS()">Save EmailJS Settings</button>
+    </div>
+
+    <div class="card mt" style="border:2px solid var(--red)">
+      <div class="card-ttl" style="color:var(--red);border-bottom-color:#fecaca">&#x1F6A8; Danger Zone</div>
+      <p class="muted sm mb">These actions are permanent and cannot be undone. The Admin password is required for all actions below.</p>
+      <div style="border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:10px">
+        <div class="bold mb" style="font-size:14px">Clear All Sales Records</div>
+        <p class="muted sm mb">Deletes all sales, notifications and resets invoice counter. Products and staff remain.</p>
+        <button class="btn btn-d btn-sm" onclick="P.dangerClear('sales')">Clear Sales</button>
+      </div>
+      <div style="border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:10px">
+        <div class="bold mb" style="font-size:14px">Clear All Stock / Products</div>
+        <p class="muted sm mb">Deletes all products and restock records. Sales data remains.</p>
+        <button class="btn btn-d btn-sm" onclick="P.dangerClear('stock')">Clear Stock</button>
+      </div>
+      <div style="border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:10px">
+        <div class="bold mb" style="font-size:14px">Clear Payroll Records</div>
+        <p class="muted sm mb">Deletes all payroll history and employee list. Everything else remains.</p>
+        <button class="btn btn-d btn-sm" onclick="P.dangerClear('payroll')">Clear Payroll</button>
+      </div>
+      <div style="border:2px solid var(--red);border-radius:10px;padding:14px;background:var(--red-pale)">
+        <div class="bold mb" style="font-size:14px;color:var(--red)">&#x26A0; Reset Entire App</div>
+        <p class="sm mb" style="color:var(--red)">Wipes ALL data — sales, stock, staff, payroll, suppliers and settings. The app returns to the first-time setup screen. This cannot be reversed.</p>
+        <button class="btn btn-d" onclick="P.dangerClear('all')">Reset Everything</button>
+      </div>
     </div>`;
 },
 
@@ -3139,6 +3123,96 @@ create table if not exists suppliers(id text primary key, name text, contact_per
 create table if not exists payroll(id text primary key, employee_id text, employee_name text, month text, year integer, basic_salary numeric default 0, allowances numeric default 0, gross_salary numeric default 0, paye numeric default 0, nhif numeric default 0, nssf numeric default 0, other_deductions numeric default 0, net_salary numeric default 0, status text default 'draft', paid_at timestamptz, notes text, created_by text, created_at timestamptz default now());
 alter table sales add column if not exists invoice_number text;</textarea>`;
     }
+  }
+},
+
+async dangerClear(type){
+  const labels={
+    sales:'Clear ALL sales records, notifications and reset invoice counter',
+    stock:'Delete ALL products and restock records',
+    payroll:'Delete ALL payroll records and employee list',
+    all:'RESET THE ENTIRE APP — delete absolutely everything'
+  };
+  const label=labels[type]||type;
+  M.open('&#x1F6A8; Confirm Danger Action',`
+    <div class="alert a-err">&#x26A0; <strong>This cannot be undone.</strong> You are about to: <strong>${label}</strong></div>
+    <div class="fg"><label>Enter Admin Password to confirm</label>
+      <input type="password" id="dangerPass" placeholder="Admin password"/>
+    </div>
+    <div id="dangerErr" class="alert a-err hidden"></div>`,
+    [
+      {lbl:'Cancel',cls:'btn-o',fn:'M.close()'},
+      {lbl:'I understand — proceed',cls:'btn-d',fn:`P._confirmDanger('${type}')`}
+    ]);
+},
+
+async _confirmDanger(type){
+  const pass=document.getElementById('dangerPass')?.value.trim();
+  const errEl=document.getElementById('dangerErr');
+  if(!pass){errEl.textContent='Enter the admin password.';errEl.classList.remove('hidden');return;}
+
+  // Verify admin password live from Supabase
+  let adminHash;
+  try{ adminHash=await SB.getConfig('admin_hash'); }
+  catch(e){ errEl.textContent='Could not verify password: '+e.message; errEl.classList.remove('hidden'); return; }
+
+  if(Auth.hash(pass)!==adminHash){
+    errEl.textContent='Incorrect admin password. Action cancelled.';
+    errEl.classList.remove('hidden');
+    document.getElementById('dangerPass').value='';
+    return;
+  }
+
+  M.close();
+  splash('Clearing data...');
+
+  try{
+    if(type==='sales'||type==='all'){
+      // Delete all sales in batches
+      let rows=await SB.select('sales');
+      for(const r of rows) await SB.delete('sales',`id=eq.${r.id}`).catch(()=>{});
+      // Delete notifications
+      rows=await SB.select('notifications');
+      for(const r of rows) await SB.delete('notifications',`id=eq.${r.id}`).catch(()=>{});
+      // Reset invoice counter
+      await SB.setConfig('invoice_counter','0').catch(()=>{});
+    }
+    if(type==='stock'||type==='all'){
+      const rows=await SB.select('products');
+      for(const r of rows) await SB.delete('products',`id=eq.${r.id}`).catch(()=>{});
+      const rs=await SB.select('restocks');
+      for(const r of rs) await SB.delete('restocks',`id=eq.${r.id}`).catch(()=>{});
+    }
+    if(type==='payroll'||type==='all'){
+      const rows=await SB.select('payroll').catch(()=>[]);
+      for(const r of rows) await SB.delete('payroll',`id=eq.${r.id}`).catch(()=>{});
+      await SB.setConfig('payroll_employees','[]').catch(()=>{});
+    }
+    if(type==='all'){
+      // Delete users (except current owner), suppliers, devices, configs
+      const users=await SB.select('users');
+      for(const u of users){
+        if(u.id!==App.cu.id) await SB.delete('users',`id=eq.${u.id}`).catch(()=>{});
+      }
+      const sups=await SB.select('suppliers').catch(()=>[]);
+      for(const s of sups) await SB.delete('suppliers',`id=eq.${s.id}`).catch(()=>{});
+      // Clear all config except admin hash and supabase connection
+      const configs=['business','groq_key','invoice_counter','payroll_employees','setup_done'];
+      for(const k of configs) await SB.setConfig(k,'').catch(()=>{});
+      // Clear local caches
+      ['sb_appcfg','lkc_cfg','sb_da','sb_dt','sb_migrate_notice'].forEach(k=>localStorage.removeItem(k));
+      hideSplash();
+      T.ok('App reset complete. Reloading...');
+      setTimeout(()=>location.reload(),1500);
+      return;
+    }
+
+    hideSplash();
+    T.ok('Done — '+{sales:'Sales cleared.',stock:'Stock cleared.',payroll:'Payroll cleared.'}[type]);
+    App.nav('settings');
+  }catch(e){
+    hideSplash();
+    T.err('Error during clear: '+e.message);
   }
 },
 
@@ -3415,6 +3489,35 @@ self.addEventListener('fetch', e => {
 }
 
 window.addEventListener('DOMContentLoaded',()=>{App.boot();PWA.init();Offline.init();});
+
+// ── PROTECT SOURCE CODE ──
+// Disable right-click context menu
+document.addEventListener('contextmenu', e => e.preventDefault());
+
+// Disable F12, Ctrl+Shift+I, Ctrl+Shift+J, Ctrl+Shift+C, Ctrl+U (view source)
+document.addEventListener('keydown', e => {
+  const k = e.key;
+  // F12
+  if (k === 'F12') { e.preventDefault(); return false; }
+  // Ctrl+Shift+I / Ctrl+Shift+J / Ctrl+Shift+C (DevTools)
+  if (e.ctrlKey && e.shiftKey && ['I','J','C','i','j','c'].includes(k)) { e.preventDefault(); return false; }
+  // Ctrl+U (View Source)
+  if (e.ctrlKey && ['U','u'].includes(k)) { e.preventDefault(); return false; }
+  // Ctrl+S (Save page)
+  if (e.ctrlKey && ['S','s'].includes(k)) { e.preventDefault(); return false; }
+});
+
+// Detect DevTools open via window size difference (desktop)
+(function detectDevTools(){
+  const threshold = 160;
+  const check = () => {
+    if (window.outerWidth - window.innerWidth > threshold ||
+        window.outerHeight - window.innerHeight > threshold) {
+      document.body.innerHTML = '<div style="display:flex;height:100vh;align-items:center;justify-content:center;font-family:sans-serif;background:#1b4332;color:#fff;flex-direction:column;gap:16px"><div style="font-size:48px">🔒</div><h2>Access Denied</h2><p>Developer tools are not permitted in this application.</p></div>';
+    }
+  };
+  setInterval(check, 1000);
+})();
 
 // ══════════════════════════════════════════════════════
 //  PWA — Install prompt
