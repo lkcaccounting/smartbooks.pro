@@ -256,10 +256,44 @@ tr:last-child td{border-bottom:none}tbody tr:hover{background:var(--bg)}
 
 @media(max-width:768px){
   .sidebar{transform:translateX(-100%)}.sidebar.open{transform:translateX(0)}
-  .topbar{left:0}.main-content{margin-left:0;padding:13px}.menu-tog{display:block}
-  .g2{grid-template-columns:1fr}.stats-grid{grid-template-columns:1fr 1fr}.cfg-g{grid-template-columns:1fr}
+  .topbar{left:0}
+  .main-content{margin-left:0;padding:12px}
+  .menu-tog{display:block}
+  .g2{grid-template-columns:1fr}
+  .stats-grid{grid-template-columns:1fr 1fr}
+  .cfg-g{grid-template-columns:1fr}
+  .modal-ov{padding:8px;align-items:flex-end}
+  .modal-box{border-radius:16px 16px 0 0;max-height:93vh;width:100%;max-width:100%}
+  .pay-method-grid{grid-template-columns:repeat(4,1fr);gap:6px}
+  .pm-opt{padding:8px 4px}.pm-icon{font-size:17px}.pm-name{font-size:10px}
+  .receipt-actions{grid-template-columns:1fr 1fr}
+  .pg-hd{flex-direction:column;gap:8px}
+  .pg-act{flex-wrap:wrap}
+  .tb-title{font-size:15px}
+  .filter-bar{flex-wrap:wrap}
+  .filter-bar .si{min-width:120px}
+  .mpesa-type-tabs{flex-wrap:wrap}
+  .rpt-tabs{gap:4px}
+  .rpt-tabs .btn{padding:5px 8px;font-size:11px}
+  .supplier-row{padding:10px}
+  th,td{padding:6px 8px;font-size:12px}
+  .tw{overflow-x:auto;-webkit-overflow-scrolling:touch}
 }
-@media(max-width:480px){.stats-grid{grid-template-columns:1fr}}
+@media(max-width:480px){
+  .stats-grid{grid-template-columns:1fr 1fr}
+  .main-content{padding:9px}
+  .card{padding:12px}
+  .modal-body{padding:13px}
+  .modal-hd{padding:11px 14px}
+  .modal-ft{padding:9px 14px;flex-wrap:wrap;gap:7px}
+  .modal-ft .btn{flex:1;justify-content:center}
+  .tb-right .tb-user{display:none}
+  .tb-right .sync-ind span{display:none}
+  .link-code{font-size:20px;letter-spacing:3px}
+  .sc-val{font-size:16px}
+  .g2{gap:8px}
+  select,input{font-size:16px}
+}
 @media print{
   .sidebar,.topbar,.pg-act,.btn,.filter-bar,.rpt-tabs,
   .offline-banner,#installBtn{display:none!important}
@@ -1304,46 +1338,98 @@ _lastSale:null,
 
 showReceiptModal(sale){
   const biz=App.cfg?.business||{};
-  M.open('Sale Complete — Send Receipt?',`
+  M.open('Sale Complete',`
     <div class="receipt-panel">
-      <div class="receipt-prod">${sale.quantity}× ${sale.product_name}</div>
+      <div class="receipt-prod">${sale.product_name} &times; ${sale.quantity}</div>
       <div class="receipt-amt">${App.fmt(sale.total)}</div>
-      <div style="font-size:12px;opacity:.75">${sale.payment_method} · ${App.fmtDT(sale.created_at)}</div>
-      <div class="receipt-id">Invoice # ${sale.invoice_number||sale.id.slice(-8).toUpperCase()}</div>
+      <div style="font-size:12px;opacity:.8">${sale.payment_method} &nbsp;|&nbsp; ${sale.customer||'Walk-in'}</div>
+      <div class="receipt-id">Ref: ${sale.invoice_number||sale.id.slice(-8).toUpperCase()}</div>
     </div>
-    <p style="font-size:13px;color:var(--text2);text-align:center;margin-bottom:12px">Does the customer want a receipt?</p>
+    <p class="muted sm mb">Send a receipt to the customer:</p>
     <div class="receipt-actions">
-      <div class="receipt-btn wa" onclick="P.sendWhatsApp()">
-        <span class="rb-icon">💬</span><span>WhatsApp</span>
-        <span style="font-size:10px;color:#15803d;font-weight:400">Free</span>
+      <div class="receipt-btn wa" onclick="P.showWaInput()">
+        <div class="rb-icon">💬</div><span>WhatsApp</span>
       </div>
-      <div class="receipt-btn" onclick="P.sendEmail()">
-        <span class="rb-icon">📧</span><span>Email</span>
-        <span style="font-size:10px;color:var(--text3);font-weight:400">Free</span>
+      <div class="receipt-btn" onclick="P.showEmailInput()">
+        <div class="rb-icon">📧</div><span>Email PDF</span>
       </div>
-      <div class="receipt-btn" onclick="P.printInv('${sale.id}');M.close()">
-        <span class="rb-icon">🖨</span><span>Print PDF</span>
-        <span style="font-size:10px;color:var(--text3);font-weight:400">Receipt</span>
+      <div class="receipt-btn" onclick="P.downloadReceiptPDF('${sale.id}')">
+        <div class="rb-icon">⬇</div><span>Download PDF</span>
       </div>
-      <div class="receipt-btn" onclick="M.close()">
-        <span class="rb-icon">✕</span><span>No Receipt</span>
-        <span style="font-size:10px;color:var(--text3);font-weight:400">Skip</span>
+      <div class="receipt-btn" onclick="P.printInv('${sale.id}')">
+        <div class="rb-icon">🖨</div><span>Print</span>
       </div>
     </div>
-    <div id="waInput" class="hidden" style="margin-top:14px">
+    <div id="waInput" class="hidden" style="margin-top:10px">
+      <div class="alert a-info sm" style="margin-bottom:10px;font-size:12px">
+        WhatsApp will open with a text receipt. To send PDF, use <b>Download PDF</b> and attach manually — WhatsApp links cannot send files directly.
+      </div>
       <div class="fg"><label>Customer WhatsApp Number</label>
         <input type="tel" id="waPhone" placeholder="e.g. 0712 345 678"/>
       </div>
-      <button class="btn btn-p btn-full" onclick="P.doSendWhatsApp()">Send on WhatsApp →</button>
+      <button class="btn btn-p btn-full" onclick="P.doSendWhatsApp('${sale.id}')">💬 Open WhatsApp</button>
     </div>
-    <div id="emailInput" class="hidden" style="margin-top:14px">
+    <div id="emailInput" class="hidden" style="margin-top:10px">
       <div class="fg"><label>Customer Email Address</label>
         <input type="email" id="custEmail" placeholder="e.g. customer@gmail.com"/>
+        <small>Sends an HTML receipt via EmailJS. Configure EmailJS in Settings → Email Receipts.</small>
       </div>
-      <button class="btn btn-p btn-full" onclick="P.doSendEmail()">Send Email Receipt →</button>
+      <button class="btn btn-p btn-full" onclick="P.doSendEmail('${sale.id}')">📧 Send Email Receipt</button>
     </div>`,
-    []);
+    [{lbl:'Done — No Receipt',cls:'btn-o',fn:'M.close()'}]);
 },
+
+showWaInput(){
+  document.getElementById('waInput')?.classList.toggle('hidden');
+  document.getElementById('emailInput')?.classList.add('hidden');
+},
+showEmailInput(){
+  document.getElementById('emailInput')?.classList.toggle('hidden');
+  document.getElementById('waInput')?.classList.add('hidden');
+},
+
+downloadReceiptPDF(saleId){
+  const sale=P._lastSale||(P._sales||[]).find(s=>s.id===saleId);
+  if(!sale){T.err('Sale data not found.');return;}
+  const biz=App.cfg?.business||{},cur=biz.currency||'KSh';
+  const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Receipt</title><style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Segoe UI',Arial,sans-serif;background:#fff;color:#1c1a16;padding:28px;max-width:360px;margin:0 auto}
+    .hd{text-align:center;border-bottom:2px solid #1b4332;padding-bottom:12px;margin-bottom:14px}
+    .bn{font-size:17px;font-weight:700;color:#1b4332}.bd{font-size:10px;color:#5c584f;margin-top:3px;line-height:1.7}
+    .inv{font-size:20px;font-weight:700;color:#b5650a;text-transform:uppercase;letter-spacing:2px}
+    .row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #ebe7de;font-size:12px}
+    .tot{display:flex;justify-content:space-between;padding:9px 0;font-size:15px;font-weight:700;border-top:2px solid #1b4332;margin-top:8px;color:#1b4332}
+    .badge{display:inline-block;background:#e8f0eb;color:#1b4332;padding:2px 9px;border-radius:99px;font-size:10px;font-weight:600}
+    .ft{margin-top:18px;text-align:center;font-size:10px;color:#8c8880;border-top:1px solid #ebe7de;padding-top:12px;line-height:1.7}
+    @media print{body{padding:10px}@page{margin:.4cm;size:80mm auto}}
+  </style></head><body>
+    <div class="hd">
+      <div class="bn">${biz.name||'Smart Books'}</div>
+      <div class="bd">${biz.address?biz.address+'<br>':''}${biz.phone?'Tel: '+biz.phone:''}${biz.kra?'<br>KRA: '+biz.kra:''}</div>
+    </div>
+    <div style="text-align:center;margin-bottom:12px">
+      <div class="inv">Receipt</div>
+      <div style="font-size:10px;color:#5c584f">No: ${sale.invoice_number||sale.id.slice(-8).toUpperCase()}</div>
+      <div style="font-size:10px;color:#5c584f">${new Date(sale.created_at||Date.now()).toLocaleString('en-KE',{day:'numeric',month:'long',year:'numeric',hour:'2-digit',minute:'2-digit'})}</div>
+    </div>
+    <div class="row"><span style="color:#5c584f">Customer</span><span>${sale.customer||'Walk-in'}</span></div>
+    <div class="row"><span style="color:#5c584f">Item</span><span>${sale.product_name} &times; ${sale.quantity}</span></div>
+    <div class="row"><span style="color:#5c584f">Unit Price</span><span>${cur} ${Number(sale.unit_price||0).toFixed(2)}</span></div>
+    <div class="tot"><span>TOTAL</span><span>${cur} ${Number(sale.total||0).toFixed(2)}</span></div>
+    <div style="margin-top:10px;display:flex;justify-content:space-between;align-items:center">
+      <span style="font-size:11px;color:#5c584f">Payment:</span><span class="badge">${sale.payment_method}</span>
+    </div>
+    <div style="margin-top:5px;font-size:11px;color:#5c584f">Served by: ${sale.sold_by}</div>
+    <div class="ft">Thank you for your business!<br>${biz.name||''}${biz.phone?' — '+biz.phone:''}</div>
+    <script>window.onload=()=>window.print()<\/script>
+  </body></html>`;
+  const w=window.open('','_blank','width=420,height=650');
+  if(!w){T.err('Please allow popups to download PDF.');return;}
+  w.document.write(html);w.document.close();
+  T.ok('Receipt opened — choose Save as PDF in the print dialog.');
+},
+
 
 buildReceiptText(sale,biz){
   const cur=biz.currency||'KSh';
@@ -1720,11 +1806,18 @@ async reports(){
   mc.innerHTML=`
     <div class="pg-hd"><div><h2>Reports</h2><p>Financial &amp; inventory summaries</p></div>
       <div class="pg-act"><button class="btn btn-o btn-sm" onclick="P.printReport()">Print / Save PDF</button></div></div>
-    <div class="rpt-tabs" style="display:flex;gap:7px;margin-bottom:16px;flex-wrap:wrap">
-      <button class="btn btn-p btn-sm" id="rtab_s" onclick="P.rTab('s')">Sales Report</button>
-      <button class="btn btn-o btn-sm" id="rtab_st" onclick="P.rTab('st')">Stock Report</button>
-      <button class="btn btn-o btn-sm" id="rtab_inv" onclick="P.rTab('inv')">Invoice List</button>
-      ${App.cu.role==='owner'?`<button class="btn btn-o btn-sm" id="rtab_vat" onclick="P.rTab('vat')">VAT / PAYE</button>`:''}
+    <div class="rpt-tabs" style="display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap">
+      <button class="btn btn-p btn-sm" id="rtab_s"   onclick="P.rTab('s')">Sales</button>
+      <button class="btn btn-o btn-sm" id="rtab_pl"  onclick="P.rTab('pl')">P&amp;L</button>
+      <button class="btn btn-o btn-sm" id="rtab_cf"  onclick="P.rTab('cf')">Cash Flow</button>
+      <button class="btn btn-o btn-sm" id="rtab_cb"  onclick="P.rTab('cb')">Cash Book</button>
+      <button class="btn btn-o btn-sm" id="rtab_pb"  onclick="P.rTab('pb')">Purchase Book</button>
+      <button class="btn btn-o btn-sm" id="rtab_jnl" onclick="P.rTab('jnl')">Journal</button>
+      <button class="btn btn-o btn-sm" id="rtab_bs"  onclick="P.rTab('bs')">Balance Sheet</button>
+      <button class="btn btn-o btn-sm" id="rtab_rec" onclick="P.rTab('rec')">Reconciliation</button>
+      <button class="btn btn-o btn-sm" id="rtab_st"  onclick="P.rTab('st')">Stock</button>
+      <button class="btn btn-o btn-sm" id="rtab_inv" onclick="P.rTab('inv')">Invoices</button>
+      ${App.cu.role==='owner'?`<button class="btn btn-o btn-sm" id="rtab_vat" onclick="P.rTab('vat')">VAT/PAYE</button>`:''}
     </div>
     <div id="rBody"></div>`;
   P._rt='s'; P.rRender();
@@ -1738,7 +1831,7 @@ printReport() {
 
 _rt:'s',
 rTab(t){
-  ['s','st','inv','vat'].forEach(x=>{const b=document.getElementById('rtab_'+x);if(b)b.className='btn btn-o btn-sm';});
+  ['s','pl','cf','cb','pb','jnl','bs','rec','st','inv','vat'].forEach(x=>{const b=document.getElementById('rtab_'+x);if(b)b.className='btn btn-o btn-sm';});
   const b=document.getElementById('rtab_'+t);if(b)b.className='btn btn-p btn-sm';
   P._rt=t; P.rRender();
 },
@@ -1760,6 +1853,365 @@ async rRender(){
   </div>`;
 
   try{
+    // ── PROFIT & LOSS ──
+    if(P._rt==='pl'){
+      el.innerHTML=rangeSel+'<div id="rContent"></div>';
+      const range=document.getElementById('rRange')?.value||'month';
+      const [allSales,restocks,payrolls]=await Promise.all([
+        SB.select('sales','','created_at.desc'),
+        SB.select('restocks','','created_at.desc'),
+        SB.select('payroll','','created_at.desc').catch(()=>[])
+      ]);
+      const now=new Date();
+      const filterDate=d=>{
+        const dt=new Date(d);
+        if(range==='today') return dt.toDateString()===now.toDateString();
+        if(range==='week'){const w=new Date(now);w.setDate(now.getDate()-7);return dt>=w;}
+        if(range==='month') return dt.getMonth()===now.getMonth()&&dt.getFullYear()===now.getFullYear();
+        return true;
+      };
+      const sales=allSales.filter(s=>filterDate(s.created_at));
+      const rstocks=restocks.filter(r=>filterDate(r.created_at));
+      const pays=payrolls.filter(r=>filterDate(r.created_at));
+      const revenue=sales.reduce((s,x)=>s+Number(x.total||0),0);
+      const cogs=rstocks.reduce((s,x)=>s+Number(x.total_cost||0),0);
+      const grossProfit=revenue-cogs;
+      const totalPayroll=pays.reduce((s,x)=>s+Number(x.net_salary||0),0);
+      const operatingProfit=grossProfit-totalPayroll;
+      const periodLabel={month:'Monthly — '+now.toLocaleDateString('en-KE',{month:'long',year:'numeric'}),week:'Weekly — Last 7 Days',today:'Daily — '+now.toLocaleDateString('en-KE',{day:'numeric',month:'long',year:'numeric'}),all:'All Time'}[range];
+      const rc=document.getElementById('rContent');
+      rc.innerHTML=`
+        <div class="rpt-print-header">${P.rptHeader('Profit & Loss Statement',periodLabel)}</div>
+        <div class="g2">
+          <div class="card">
+            <div style="font-size:13px;font-weight:700;color:#1b4332;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid #1b4332">INCOME</div>
+            ${P.rptSummaryRow('Sales Revenue',App.fmt(revenue))}
+            ${P.rptSummaryRow('Total Income',App.fmt(revenue),true,'#15803d')}
+            <div style="margin-top:16px;font-size:13px;font-weight:700;color:#1b4332;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid #1b4332">COST OF GOODS SOLD</div>
+            ${P.rptSummaryRow('Stock Purchases / Restocks',App.fmt(cogs))}
+            ${P.rptSummaryRow('Total COGS',App.fmt(cogs),true,'#b91c1c')}
+            <div style="height:1px;background:#eee;margin:12px 0"></div>
+            ${P.rptSummaryRow('GROSS PROFIT',App.fmt(grossProfit),true,grossProfit>=0?'#15803d':'#b91c1c')}
+          </div>
+          <div class="card">
+            <div style="font-size:13px;font-weight:700;color:#1b4332;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid #1b4332">OPERATING EXPENSES</div>
+            ${P.rptSummaryRow('Payroll (Net Salaries)',App.fmt(totalPayroll))}
+            ${P.rptSummaryRow('Total Expenses',App.fmt(totalPayroll),true,'#b91c1c')}
+            <div style="height:1px;background:#eee;margin:12px 0"></div>
+            ${P.rptSummaryRow('OPERATING PROFIT (EBIT)',App.fmt(operatingProfit),true,operatingProfit>=0?'#15803d':'#b91c1c')}
+            <div style="margin-top:14px;padding:12px;background:var(--${operatingProfit>=0?'green':'red'}-pale);border-radius:8px;text-align:center">
+              <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em">Net Profit / Loss</div>
+              <div style="font-family:var(--fd);font-size:28px;font-weight:700;color:${operatingProfit>=0?'#15803d':'#b91c1c'}">${App.fmt(operatingProfit)}</div>
+              <div style="font-size:11px;color:var(--text3);margin-top:4px">Gross margin: ${revenue>0?(grossProfit/revenue*100).toFixed(1):'0'}%</div>
+            </div>
+            <div style="margin-top:12px;font-size:11px;color:#8c8880">Note: Add loan repayments, rent, utilities and other expenses manually to get a complete picture. This is based on data recorded in Smart Books only.</div>
+          </div>
+        </div>`;
+      return;
+    }
+
+    // ── CASH FLOW ──
+    if(P._rt==='cf'){
+      el.innerHTML=rangeSel+'<div id="rContent"></div>';
+      const range=document.getElementById('rRange')?.value||'month';
+      const [allSales,restocks,payrolls]=await Promise.all([
+        SB.select('sales','','created_at.asc'),
+        SB.select('restocks','','created_at.asc'),
+        SB.select('payroll','status=eq.paid','created_at.asc').catch(()=>[])
+      ]);
+      const now=new Date();
+      const filterDate=d=>{const dt=new Date(d);if(range==='today')return dt.toDateString()===now.toDateString();if(range==='week'){const w=new Date(now);w.setDate(now.getDate()-7);return dt>=w;}if(range==='month')return dt.getMonth()===now.getMonth()&&dt.getFullYear()===now.getFullYear();return true;};
+      const sales=allSales.filter(s=>filterDate(s.created_at));
+      const rstocks=restocks.filter(r=>filterDate(r.created_at));
+      const pays=payrolls.filter(p=>filterDate(p.created_at));
+      const cashIn=sales.reduce((s,x)=>s+Number(x.total||0),0);
+      const cashOutStock=rstocks.reduce((s,x)=>s+Number(x.total_cost||0),0);
+      const cashOutPayroll=pays.reduce((s,x)=>s+Number(x.net_salary||0),0);
+      const totalOut=cashOutStock+cashOutPayroll;
+      const netCash=cashIn-totalOut;
+      const periodLabel={month:'Monthly — '+now.toLocaleDateString('en-KE',{month:'long',year:'numeric'}),week:'Weekly — Last 7 Days',today:'Daily',all:'All Time'}[range];
+      const rc=document.getElementById('rContent');
+      rc.innerHTML=`
+        <div class="rpt-print-header">${P.rptHeader('Cash Flow Statement',periodLabel)}</div>
+        <div class="g2">
+          <div class="card">
+            <div style="font-size:13px;font-weight:700;color:#1b4332;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid #15803d">CASH INFLOWS</div>
+            ${P.rptSummaryRow('Sales Revenue (all methods)',App.fmt(cashIn))}
+            ${P.rptSummaryRow('Total Cash In',App.fmt(cashIn),true,'#15803d')}
+          </div>
+          <div class="card">
+            <div style="font-size:13px;font-weight:700;color:#b91c1c;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid #b91c1c">CASH OUTFLOWS</div>
+            ${P.rptSummaryRow('Stock Purchases',App.fmt(cashOutStock))}
+            ${P.rptSummaryRow('Payroll (paid only)',App.fmt(cashOutPayroll))}
+            ${P.rptSummaryRow('Total Cash Out',App.fmt(totalOut),true,'#b91c1c')}
+          </div>
+        </div>
+        <div class="card mt">
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 0">
+            <span style="font-size:16px;font-weight:700;color:var(--dark)">NET CASH FLOW</span>
+            <span style="font-family:var(--fd);font-size:28px;font-weight:700;color:${netCash>=0?'#15803d':'#b91c1c'}">${App.fmt(netCash)}</span>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:10px">
+            <div style="background:var(--green-pale);border-radius:8px;padding:12px;text-align:center"><div style="font-size:11px;color:var(--text3);text-transform:uppercase">Total In</div><div style="font-weight:700;color:#15803d">${App.fmt(cashIn)}</div></div>
+            <div style="background:var(--red-pale);border-radius:8px;padding:12px;text-align:center"><div style="font-size:11px;color:var(--text3);text-transform:uppercase">Total Out</div><div style="font-weight:700;color:#b91c1c">${App.fmt(totalOut)}</div></div>
+            <div style="background:${netCash>=0?'var(--green-pale)':'var(--red-pale)'};border-radius:8px;padding:12px;text-align:center"><div style="font-size:11px;color:var(--text3);text-transform:uppercase">Net</div><div style="font-weight:700;color:${netCash>=0?'#15803d':'#b91c1c'}">${App.fmt(netCash)}</div></div>
+          </div>
+          <p style="margin-top:12px;font-size:11px;color:#8c8880">Note: Add rent, utilities, loan repayments and other cash expenses manually for a complete statement. Only recorded payroll marked as "paid" is included as outflow.</p>
+        </div>`;
+      return;
+    }
+
+    // ── CASH BOOK ──
+    if(P._rt==='cb'){
+      el.innerHTML=rangeSel+'<div id="rContent"></div>';
+      const range=document.getElementById('rRange')?.value||'month';
+      const [allSales,restocks]=await Promise.all([
+        SB.select('sales','','created_at.asc'),
+        SB.select('restocks','','created_at.asc')
+      ]);
+      const now=new Date();
+      const filterDate=d=>{const dt=new Date(d);if(range==='today')return dt.toDateString()===now.toDateString();if(range==='week'){const w=new Date(now);w.setDate(now.getDate()-7);return dt>=w;}if(range==='month')return dt.getMonth()===now.getMonth()&&dt.getFullYear()===now.getFullYear();return true;};
+      const sales=allSales.filter(s=>filterDate(s.created_at));
+      const rstocks=restocks.filter(r=>filterDate(r.created_at));
+      // Merge and sort all transactions
+      const entries=[
+        ...sales.map(s=>({date:s.created_at,desc:`Sale — ${s.product_name} ×${s.quantity}`,ref:s.invoice_number||s.id.slice(-6),debit:Number(s.total||0),credit:0,type:'sale',by:s.sold_by})),
+        ...rstocks.map(r=>({date:r.created_at,desc:`Purchase — ${r.product_name} ×${r.quantity}`,ref:r.id.slice(-6),debit:0,credit:Number(r.total_cost||0),type:'restock',by:r.recorded_by}))
+      ].sort((a,b)=>new Date(a.date)-new Date(b.date));
+      let balance=0;
+      const periodLabel={month:'Monthly — '+now.toLocaleDateString('en-KE',{month:'long',year:'numeric'}),week:'Weekly — Last 7 Days',today:'Daily',all:'All Time'}[range];
+      const rc=document.getElementById('rContent');
+      rc.innerHTML=`
+        <div class="rpt-print-header">${P.rptHeader('Cash Book',periodLabel)}</div>
+        <div class="card">
+          <div class="tw">
+            <table>
+              <thead style="background:#1b4332;color:#fff">
+                <tr><th>Date</th><th>Description</th><th>Ref</th><th>By</th><th style="text-align:right">Money In</th><th style="text-align:right">Money Out</th><th style="text-align:right">Balance</th></tr>
+              </thead>
+              <tbody>
+                ${entries.length?entries.map(e=>{
+                  balance+=e.debit-e.credit;
+                  return`<tr>
+                    <td style="white-space:nowrap">${App.fmtD(e.date)}</td>
+                    <td>${e.desc}</td>
+                    <td style="font-family:monospace;font-size:11px;color:#8c8880">${e.ref}</td>
+                    <td style="font-size:12px;color:#5c584f">${e.by||'—'}</td>
+                    <td style="text-align:right;color:#15803d;font-weight:${e.debit?'600':'400'}">${e.debit?App.fmt(e.debit):'—'}</td>
+                    <td style="text-align:right;color:#b91c1c;font-weight:${e.credit?'600':'400'}">${e.credit?App.fmt(e.credit):'—'}</td>
+                    <td style="text-align:right;font-weight:700;color:${balance>=0?'#15803d':'#b91c1c'}">${App.fmt(balance)}</td>
+                  </tr>`;
+                }).join(''):'<tr><td colspan="7" style="text-align:center;padding:18px;color:#8c8880">No transactions in this period.</td></tr>'}
+              </tbody>
+              <tfoot>
+                <tr style="background:var(--bg2);font-weight:700">
+                  <td colspan="4" style="padding:10px 12px">CLOSING BALANCE</td>
+                  <td style="text-align:right;padding:10px 12px;color:#15803d">${App.fmt(entries.reduce((s,e)=>s+e.debit,0))}</td>
+                  <td style="text-align:right;padding:10px 12px;color:#b91c1c">${App.fmt(entries.reduce((s,e)=>s+e.credit,0))}</td>
+                  <td style="text-align:right;padding:10px 12px;color:${balance>=0?'#15803d':'#b91c1c'}">${App.fmt(balance)}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>`;
+      return;
+    }
+
+    // ── PURCHASE BOOK ──
+    if(P._rt==='pb'){
+      el.innerHTML=rangeSel+'<div id="rContent"></div>';
+      const range=document.getElementById('rRange')?.value||'month';
+      const allRestocks=await SB.select('restocks','','created_at.desc');
+      const now=new Date();
+      const filterDate=d=>{const dt=new Date(d);if(range==='today')return dt.toDateString()===now.toDateString();if(range==='week'){const w=new Date(now);w.setDate(now.getDate()-7);return dt>=w;}if(range==='month')return dt.getMonth()===now.getMonth()&&dt.getFullYear()===now.getFullYear();return true;};
+      const rstocks=allRestocks.filter(r=>filterDate(r.created_at));
+      const totalCost=rstocks.reduce((s,r)=>s+Number(r.total_cost||0),0);
+      const periodLabel={month:'Monthly — '+now.toLocaleDateString('en-KE',{month:'long',year:'numeric'}),week:'Weekly',today:'Daily',all:'All Time'}[range];
+      const bySupplier=rstocks.reduce((a,r)=>{const k=r.supplier||'Unknown';if(!a[k])a[k]=0;a[k]+=Number(r.total_cost||0);return a;},{});
+      const rc=document.getElementById('rContent');
+      rc.innerHTML=`
+        <div class="rpt-print-header">${P.rptHeader('Purchase Book',periodLabel)}</div>
+        <div class="g2" style="margin-bottom:14px">
+          <div style="background:var(--bg2);border-radius:8px;padding:12px 16px"><div style="font-size:11px;color:var(--text3);text-transform:uppercase">Total Purchases</div><div style="font-family:var(--fd);font-size:22px;font-weight:700;color:#b91c1c">${App.fmt(totalCost)}</div></div>
+          <div style="background:var(--bg2);border-radius:8px;padding:12px 16px"><div style="font-size:11px;color:var(--text3);text-transform:uppercase">Purchase Orders</div><div style="font-family:var(--fd);font-size:22px;font-weight:700;color:var(--dark)">${rstocks.length}</div></div>
+        </div>
+        <div class="card">
+          <div class="tw">
+            <table>
+              <thead style="background:#1b4332;color:#fff">
+                <tr><th>No.</th><th>Date</th><th>Product</th><th>Qty</th><th style="text-align:right">Cost/Unit</th><th style="text-align:right">Total Cost</th><th>Supplier</th><th>Recorded By</th><th>Notes</th></tr>
+              </thead>
+              <tbody>
+                ${rstocks.length?rstocks.map((r,i)=>`<tr>
+                  <td style="color:#8c8880">${i+1}</td>
+                  <td style="white-space:nowrap">${App.fmtD(r.created_at)}</td>
+                  <td><strong>${r.product_name}</strong></td>
+                  <td>${r.quantity}</td>
+                  <td style="text-align:right">${App.fmt(r.cost_per_unit||0)}</td>
+                  <td style="text-align:right;font-weight:600">${App.fmt(r.total_cost||0)}</td>
+                  <td>${r.supplier||'—'}</td>
+                  <td style="font-size:12px">${r.recorded_by||'—'}</td>
+                  <td style="font-size:12px;color:#8c8880">${r.notes||'—'}</td>
+                </tr>`).join(''):'<tr><td colspan="9" style="text-align:center;padding:18px;color:#8c8880">No purchases in this period.</td></tr>'}
+              </tbody>
+              <tfoot>
+                <tr style="background:var(--bg2);font-weight:700">
+                  <td colspan="5" style="text-align:right;padding:10px 12px">TOTAL PURCHASES:</td>
+                  <td style="text-align:right;padding:10px 12px;color:#b91c1c">${App.fmt(totalCost)}</td>
+                  <td colspan="3"></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+        <div class="card mt"><div style="font-size:13px;font-weight:700;color:#1b4332;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid #1b4332">BY SUPPLIER</div>
+          ${Object.entries(bySupplier).sort((a,b)=>b[1]-a[1]).map(([sup,amt])=>P.rptSummaryRow(sup,App.fmt(amt))).join('')}
+        </div>`;
+      return;
+    }
+
+    // ── JOURNAL ──
+    if(P._rt==='jnl'){
+      el.innerHTML=rangeSel+'<div id="rContent"></div>';
+      const range=document.getElementById('rRange')?.value||'month';
+      const [allSales,restocks]=await Promise.all([
+        SB.select('sales','','created_at.asc'),
+        SB.select('restocks','','created_at.asc')
+      ]);
+      const now=new Date();
+      const filterDate=d=>{const dt=new Date(d);if(range==='today')return dt.toDateString()===now.toDateString();if(range==='week'){const w=new Date(now);w.setDate(now.getDate()-7);return dt>=w;}if(range==='month')return dt.getMonth()===now.getMonth()&&dt.getFullYear()===now.getFullYear();return true;};
+      const sales=allSales.filter(s=>filterDate(s.created_at));
+      const rstocks=restocks.filter(r=>filterDate(r.created_at));
+      // Auto-generate double entry journal
+      const entries=[];
+      sales.forEach((s,i)=>{
+        const amt=Number(s.total||0);
+        entries.push({date:s.created_at,ref:`INV-${s.invoice_number||s.id.slice(-4)}`,desc:`Sale of ${s.product_name} ×${s.quantity} to ${s.customer||'Walk-in'}`,debitAcc:`Cash / ${s.payment_method}`,creditAcc:'Sales Revenue',debit:amt,credit:0,idx:i*2});
+        entries.push({date:s.created_at,ref:`INV-${s.invoice_number||s.id.slice(-4)}`,desc:'',debitAcc:'',creditAcc:'Sales Revenue',debit:0,credit:amt,idx:i*2+1,isCr:true});
+      });
+      rstocks.forEach((r,i)=>{
+        const amt=Number(r.total_cost||0);
+        entries.push({date:r.created_at,ref:`PO-${r.id.slice(-4)}`,desc:`Purchase of ${r.product_name} ×${r.quantity} from ${r.supplier||'Supplier'}`,debitAcc:'Inventory / Stock',creditAcc:'',debit:amt,credit:0});
+        entries.push({date:r.created_at,ref:`PO-${r.id.slice(-4)}`,desc:'',debitAcc:'',creditAcc:'Cash / Accounts Payable',debit:0,credit:amt,isCr:true});
+      });
+      const totalDebits=sales.reduce((s,x)=>s+Number(x.total||0),0)+rstocks.reduce((s,x)=>s+Number(x.total_cost||0),0);
+      const totalCredits=totalDebits;
+      const periodLabel={month:'Monthly — '+now.toLocaleDateString('en-KE',{month:'long',year:'numeric'}),week:'Weekly',today:'Daily',all:'All Time'}[range];
+      const rc=document.getElementById('rContent');
+      rc.innerHTML=`
+        <div class="rpt-print-header">${P.rptHeader('General Journal',periodLabel)}</div>
+        <div class="alert a-info sm mb">Auto-generated double-entry journal from recorded sales and purchases. Debit = money/value coming in. Credit = money/value going out or owed.</div>
+        <div class="card">
+          <div class="tw">
+            <table>
+              <thead style="background:#1b4332;color:#fff">
+                <tr><th>Date</th><th>Ref</th><th>Description / Account</th><th style="text-align:right">Debit (KSh)</th><th style="text-align:right">Credit (KSh)</th></tr>
+              </thead>
+              <tbody>
+                ${entries.length?entries.map(e=>`<tr style="${e.isCr?'background:var(--bg)':''}">
+                  <td style="white-space:nowrap;color:#8c8880">${e.date?App.fmtD(e.date):''}</td>
+                  <td style="font-family:monospace;font-size:11px;color:#5c584f">${e.ref||''}</td>
+                  <td style="${e.isCr?'padding-left:24px;color:#5c584f':'font-weight:600'}">
+                    ${e.isCr?`<i>Cr. ${e.creditAcc}</i>`:`Dr. ${e.debitAcc}${e.desc?` — <span style="font-weight:400;font-size:12px;color:#8c8880">${e.desc}</span>`:''}`}
+                  </td>
+                  <td style="text-align:right;font-weight:${e.debit?'600':'400'};color:${e.debit?'#15803d':'#ccc'}">${e.debit?App.fmt(e.debit):'—'}</td>
+                  <td style="text-align:right;font-weight:${e.credit?'600':'400'};color:${e.credit?'#b91c1c':'#ccc'}">${e.credit?App.fmt(e.credit):'—'}</td>
+                </tr>`).join(''):'<tr><td colspan="5" style="text-align:center;padding:18px;color:#8c8880">No journal entries for this period.</td></tr>'}
+              </tbody>
+              <tfoot>
+                <tr style="background:var(--bg2);font-weight:700">
+                  <td colspan="3" style="padding:10px 12px;text-align:right">TOTALS (must match for balanced books):</td>
+                  <td style="text-align:right;padding:10px 12px;color:#15803d">${App.fmt(totalDebits)}</td>
+                  <td style="text-align:right;padding:10px 12px;color:#b91c1c">${App.fmt(totalCredits)}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>`;
+      return;
+    }
+
+    // ── BALANCE SHEET ──
+    if(P._rt==='bs'){
+      const [prods,allSales,restocks]=await Promise.all([
+        SB.select('products','active=eq.true'),
+        SB.select('sales','','created_at.desc'),
+        SB.select('restocks','','created_at.desc')
+      ]);
+      const stockValue=prods.reduce((s,p)=>s+Number(p.quantity||0)*Number(p.cost_price||0),0);
+      const totalRevenue=allSales.reduce((s,x)=>s+Number(x.total||0),0);
+      const totalPurchases=restocks.reduce((s,r)=>s+Number(r.total_cost||0),0);
+      const retainedEarnings=totalRevenue-totalPurchases;
+      const rc=document.getElementById('rBody');
+      rc.innerHTML=`
+        <div class="rpt-print-header">${P.rptHeader('Balance Sheet','As at '+new Date().toLocaleDateString('en-KE',{day:'numeric',month:'long',year:'numeric'}))}</div>
+        <div class="alert a-warn mb sm">This is a simplified Balance Sheet based on data in Smart Books only. It does not include fixed assets, bank loans, receivables or payables not recorded in the app. Have your accountant complete the full statement.</div>
+        <div class="g2">
+          <div class="card">
+            <div style="font-size:13px;font-weight:700;color:#1b4332;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid #1b4332">ASSETS</div>
+            <div style="font-size:11px;font-weight:700;color:#5c584f;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Current Assets</div>
+            ${P.rptSummaryRow('Cash from Sales (all time)',App.fmt(totalRevenue))}
+            ${P.rptSummaryRow('Stock / Inventory (at cost)',App.fmt(stockValue))}
+            <div style="height:1px;background:#eee;margin:8px 0"></div>
+            ${P.rptSummaryRow('TOTAL ASSETS',App.fmt(totalRevenue+stockValue),true,'#15803d')}
+          </div>
+          <div class="card">
+            <div style="font-size:13px;font-weight:700;color:#1b4332;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid #1b4332">LIABILITIES & EQUITY</div>
+            <div style="font-size:11px;font-weight:700;color:#5c584f;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Liabilities</div>
+            ${P.rptSummaryRow('Loans / Creditors (add manually)','—')}
+            ${P.rptSummaryRow('Total Liabilities','—')}
+            <div style="font-size:11px;font-weight:700;color:#5c584f;text-transform:uppercase;letter-spacing:.06em;margin:10px 0 8px">Equity</div>
+            ${P.rptSummaryRow('Total Purchases / Cost',App.fmt(totalPurchases))}
+            ${P.rptSummaryRow('Retained Earnings',App.fmt(retainedEarnings),false,retainedEarnings>=0?'#15803d':'#b91c1c')}
+            <div style="height:1px;background:#eee;margin:8px 0"></div>
+            ${P.rptSummaryRow('TOTAL EQUITY',App.fmt(retainedEarnings),true,retainedEarnings>=0?'#15803d':'#b91c1c')}
+          </div>
+        </div>`;
+      return;
+    }
+
+    // ── RECONCILIATION ──
+    if(P._rt==='rec'){
+      el.innerHTML=rangeSel+`
+        <div id="rContent">
+          <div class="rpt-print-header">${P.rptHeader('Bank / Mpesa Reconciliation','Compare app records vs your statement')}</div>
+          <div class="alert a-info sm mb">Download your Mpesa statement from MySafaricom App or Mpesa portal. Get the total received, paste it below. Smart Books will compare it against what was recorded in the app.</div>
+          <div class="g2">
+            <div class="card">
+              <div style="font-size:13px;font-weight:700;color:#1b4332;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid #1b4332">STEP 1 — App Records</div>
+              <div id="recAppTotals"><div class="empty"><div class="spin" style="margin:0 auto"></div></div></div>
+            </div>
+            <div class="card">
+              <div style="font-size:13px;font-weight:700;color:#1b4332;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid #1b4332">STEP 2 — Your Statement</div>
+              <div class="fg"><label>Mpesa Total Received (KSh)</label><input type="number" id="recMpesa" placeholder="Paste from statement" oninput="P.runRecon()"/></div>
+              <div class="fg"><label>Bank Total Received (KSh)</label><input type="number" id="recBank" placeholder="Paste from bank statement" oninput="P.runRecon()"/></div>
+              <div class="fg"><label>Cash Counted (KSh)</label><input type="number" id="recCash" placeholder="Physical cash counted" oninput="P.runRecon()"/></div>
+            </div>
+          </div>
+          <div class="card mt" id="recResult" style="display:none"></div>
+        </div>`;
+      // Load app totals for selected range
+      const range=document.getElementById('rRange')?.value||'month';
+      const allSales=await SB.select('sales','','created_at.desc');
+      const now=new Date();
+      const filterDate=d=>{const dt=new Date(d);if(range==='today')return dt.toDateString()===now.toDateString();if(range==='week'){const w=new Date(now);w.setDate(now.getDate()-7);return dt>=w;}if(range==='month')return dt.getMonth()===now.getMonth()&&dt.getFullYear()===now.getFullYear();return true;};
+      const sales=allSales.filter(s=>filterDate(s.created_at));
+      const byMethod=sales.reduce((a,s)=>{a[s.payment_method]=(a[s.payment_method]||0)+Number(s.total||0);return a;},{});
+      const mpesaTotal=(byMethod['Mpesa']||0)+(byMethod['Pochi']||0);
+      const bankTotal=byMethod['Bank']||0;
+      const cashTotal=byMethod['Cash']||0;
+      P._recByMethod=byMethod;P._recMpesaApp=mpesaTotal;P._recBankApp=bankTotal;P._recCashApp=cashTotal;
+      const appEl=document.getElementById('recAppTotals');
+      if(appEl) appEl.innerHTML=`
+        ${P.rptSummaryRow('Mpesa (incl. Pochi)',App.fmt(mpesaTotal))}
+        ${P.rptSummaryRow('Bank',App.fmt(bankTotal))}
+        ${P.rptSummaryRow('Cash',App.fmt(cashTotal))}
+        ${Object.entries(byMethod).filter(([m])=>!['Mpesa','Pochi','Bank','Cash'].includes(m)).map(([m,v])=>P.rptSummaryRow(m,App.fmt(v))).join('')}
+        <div style="height:1px;background:#eee;margin:8px 0"></div>
+        ${P.rptSummaryRow('TOTAL IN APP',App.fmt(sales.reduce((s,x)=>s+Number(x.total||0),0)),true,'#15803d')}`;
+      return;
+    }
+
     // ── STOCK REPORT ──
     if(P._rt==='st'){
       const prods=await SB.select('products','active=eq.true','name.asc');
@@ -2893,6 +3345,41 @@ printPayslip(id){
 
 printPayroll(){
   window.print();
+},
+
+runRecon(){
+  const mpesaStmt=parseFloat(document.getElementById('recMpesa')?.value)||0;
+  const bankStmt=parseFloat(document.getElementById('recBank')?.value)||0;
+  const cashStmt=parseFloat(document.getElementById('recCash')?.value)||0;
+  const mpesaDiff=mpesaStmt-(P._recMpesaApp||0);
+  const bankDiff=bankStmt-(P._recBankApp||0);
+  const cashDiff=cashStmt-(P._recCashApp||0);
+  const el=document.getElementById('recResult');
+  if(!el) return;
+  el.style.display='block';
+  const row=(label,app,stmt,diff)=>`
+    <div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:8px;padding:9px 0;border-bottom:1px solid var(--border);font-size:13px;align-items:center">
+      <span style="font-weight:600">${label}</span>
+      <span style="text-align:right">${App.fmt(app)}</span>
+      <span style="text-align:right">${App.fmt(stmt)}</span>
+      <span style="text-align:right;font-weight:700;color:${Math.abs(diff)<0.5?'#15803d':diff>0?'#b5650a':'#b91c1c'}">${diff>0?'+':''}${App.fmt(diff)} ${Math.abs(diff)<0.5?'✓':diff>0?'↑ Stmt higher':'↓ App higher'}</span>
+    </div>`;
+  el.innerHTML=`
+    <div style="font-size:13px;font-weight:700;color:#1b4332;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid #1b4332">RECONCILIATION RESULT</div>
+    <div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:8px;padding:7px 0;margin-bottom:4px">
+      <span style="font-size:11px;font-weight:700;color:#5c584f;text-transform:uppercase">Method</span>
+      <span style="font-size:11px;font-weight:700;color:#5c584f;text-align:right;text-transform:uppercase">App Records</span>
+      <span style="font-size:11px;font-weight:700;color:#5c584f;text-align:right;text-transform:uppercase">Statement</span>
+      <span style="font-size:11px;font-weight:700;color:#5c584f;text-align:right;text-transform:uppercase">Difference</span>
+    </div>
+    ${row('Mpesa / Pochi',P._recMpesaApp||0,mpesaStmt,mpesaDiff)}
+    ${row('Bank',P._recBankApp||0,bankStmt,bankDiff)}
+    ${row('Cash',P._recCashApp||0,cashStmt,cashDiff)}
+    <div style="margin-top:12px;padding:12px;background:${Math.abs(mpesaDiff)+Math.abs(bankDiff)+Math.abs(cashDiff)<1?'var(--green-pale)':'var(--gold-pale)'};border-radius:8px;font-size:13px">
+      ${Math.abs(mpesaDiff)+Math.abs(bankDiff)+Math.abs(cashDiff)<1
+        ?'<strong style="color:#15803d">&#x2713; Books are balanced!</strong> App records match your statements.'
+        :`<strong style="color:#b5650a">&#x26A0; Discrepancy found.</strong> Total difference: ${App.fmt(Math.abs(mpesaDiff+bankDiff+cashDiff))}. Review unrecorded sales or returns.`}
+    </div>`;
 },
 
 // ─── SETTINGS ───
